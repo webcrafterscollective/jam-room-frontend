@@ -12,55 +12,46 @@ const ERR = (...args) => console.error('[ROOM]', ...args);
 // -----------------------------------------------------------------------------
 // UI ICONS (Inlined SVGs for a modern look without new dependencies)
 // -----------------------------------------------------------------------------
-
 const IconMic = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15a3 3 0 0 1-3-3V4.5a3 3 0 0 1 6 0V12a3 3 0 0 1-3 3Z" />
   </svg>
 );
-
 const IconMicOff = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
     <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Zm-3.75 3a.75.75 0 0 0-1.5 0v.75a.75.75 0 0 0 1.5 0v-.75ZM12 15.75a.75.75 0 0 1-.75.75H9.75a.75.75 0 0 1 0-1.5h1.5a.75.75 0 0 1 .75.75Zm.75 2.25a.75.75 0 0 0 1.5 0v-.75a.75.75 0 0 0-1.5 0v.75ZM12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15a3 3 0 0 1-3-3V4.5a3 3 0 0 1 6 0V12a3 3 0 0 1-3 3Zm-3.938-6.528A4.5 4.5 0 0 0 6 12v1.5M18 12a4.486 4.486 0 0 0-3.062-4.028M18 13.5v-1.5a4.5 4.5 0 1 0-9 0v1.5m-3.062 4.028A4.486 4.486 0 0 1 6 12m6 9.75v-3.75M3.75 3.75l16.5 16.5" />
   </svg>
 );
-
 const IconPlay = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
     <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L8.029 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" />
   </svg>
 );
-
 const IconStop = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
     <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
   </svg>
 );
-
 const IconPlug = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
     <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.83-5.83M11.42 15.17l-4.24-4.24m5.83-5.83L15.17 11.42M12.75 5.1a.75.75 0 0 0-1.06 0l-4.24 4.24a.75.75 0 0 0 0 1.06l4.24 4.24a.75.75 0 0 0 1.06 0l4.24-4.24a.75.75 0 0 0 0-1.06l-4.24-4.24Z" />
   </svg>
 );
-
 const IconPlugOff = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
     <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.83-5.83M11.42 15.17l-4.24-4.24m5.83-5.83L15.17 11.42M12.75 5.1a.75.75 0 0 0-1.06 0l-4.24 4.24a.75.75 0 0 0 0 1.06l4.24 4.24a.75.75 0 0 0 1.06 0l4.24-4.24a.75.75 0 0 0 0-1.06l-4.24-4.24ZM3 3l18 18" />
   </svg>
 );
-
 const IconUser = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
     <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
   </svg>
 );
-
 const IconMetronome = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
     <path strokeLinecap="round" strokeLinejoin="round" d="m9 9 6-6m0 0 6 6m-6-6v6m0 6v6m6-6h6m-6 0H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
   </svg>
 );
-
 const IconSpeaker = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
     <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
@@ -229,11 +220,11 @@ export default function RoomPage() {
   const firstUnmountRef = useRef(false);
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Boot: AudioContext + click sample + register socket listeners (once)
+  // --- FIX: useEffect 1 (Boot & Lifecycle) ---
   //
   // Responsibilities:
+  //   • Runs ONCE on mount.
   //   • Create AudioContext and decode /click.mp3
-  //   • Register socket listeners for participants, producers, data producers
   //   • Handle window.beforeunload to best-effort disconnect
   //   • On cleanup: remove listeners and disconnect (with dev-mode guard)
   // ────────────────────────────────────────────────────────────────────────────
@@ -262,8 +253,53 @@ export default function RoomPage() {
       }
     })();
 
-    // Socket listeners — registered via service so they persist across reconnects
+    // Disconnect socket when tab is closing (best-effort)
+    const onBeforeUnload = () => {
+      LOG('beforeunload → disconnect');
+      socketService.disconnect();
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
 
+    // Cleanup with React 18 dev double-unmount guard
+    return () => {
+      LOG('boot useEffect cleanup start');
+
+      // In development, React StrictMode mounts/unmounts twice.
+      // We ignore the first cleanup to avoid disconnecting too early.
+      if (
+        process.env.NODE_ENV !== 'production' &&
+        !firstUnmountRef.current
+      ) {
+        firstUnmountRef.current = true;
+        LOG(
+          'dev double-unmount guard: skipping disconnect on first cleanup'
+        );
+        window.removeEventListener('beforeunload', onBeforeUnload);
+        return;
+      }
+
+      // Real cleanup: remove listeners + beforeunload, then disconnect
+      window.removeEventListener('beforeunload', onBeforeUnload);
+
+      LOG('cleanup → disconnect now');
+      socketService.disconnect(); // Safe to call multiple times
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId]); // This effect should ONLY run once based on roomId.
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // --- FIX: useEffect 2 (Socket Listeners) ---
+  //
+  // Responsibilities:
+  //   • Runs after boot.
+  //   • Re-runs when state it depends on changes (e.g., metronomeLeaderSocketId).
+  //   • Registers all socket event listeners.
+  //   • On cleanup: *only* removes the listeners it registered.
+  // ────────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    LOG('Registering socket listeners...', { metronomeLeaderSocketId, metronomeDataProducerId: metronomeDataProducer?.id });
+
+    // Socket listeners — registered via service so they persist across reconnects
     const off1 = socketService.onParticipantJoined(({ socketId }) => {
       LOG('[SOCKET] participantJoined', socketId);
       // Add new joiner to participant list
@@ -321,13 +357,15 @@ export default function RoomPage() {
       });
     });
 
+    // This listener's callback needs the *current* metronomeLeaderSocketId,
+    // which is why this entire effect hook re-runs when it changes.
     const off5 = socketService.onDataProducerCreated(
       ({ dataProducerId, label, ownerSocketId }) => {
         LOG('[SOCKET] dataProducerCreated', {
           dataProducerId,
           label,
           ownerSocketId,
-          leader: metronomeLeaderSocketId,
+          leader: metronomeLeaderSocketId, // This value is now fresh
         });
         // Only track the leader’s metronome DataProducer
         if (label === 'metronome' && ownerSocketId === metronomeLeaderSocketId) {
@@ -336,7 +374,7 @@ export default function RoomPage() {
       }
     );
 
-    // --- ADD THIS LISTENER (for Fix 1) ---
+    // Listener for when the server assigns a new leader
     const off6 = socketService.on('newMetronomeLeader', ({ leaderSocketId }) => {
       LOG('[SOCKET] newMetronomeLeader', leaderSocketId);
       setMetronomeLeaderSocketId(leaderSocketId);
@@ -347,9 +385,8 @@ export default function RoomPage() {
       setIsMetronomeConsuming(false);
       setMetronomeDataProducer(null);
     });
-    // --- END ADD ---
 
-    // --- ADD THIS LISTENER (for Fix 2) ---
+    // Listener for when the data producer (metronome) is closed
     const off7 = socketService.on('dataProducerClosed', ({ dataProducerId }) => {
       LOG('[SOCKET] dataProducerClosed', dataProducerId);
       // If the closed data producer is the one we were tracking, clear it.
@@ -358,42 +395,10 @@ export default function RoomPage() {
         setIsMetronomeConsuming(false);
       }
     });
-    // --- END ADD ---
 
-    // Disconnect socket when tab is closing (best-effort)
-    const onBeforeUnload = () => {
-      LOG('beforeunload → disconnect');
-      socketService.disconnect();
-    };
-    window.addEventListener('beforeunload', onBeforeUnload);
-
-    // Cleanup with React 18 dev double-unmount guard
+    // Cleanup function for THIS effect: *only* remove listeners
     return () => {
-      LOG('boot useEffect cleanup start');
-
-      // In development, React StrictMode mounts/unmounts twice.
-      // We ignore the first cleanup to avoid disconnecting too early.
-      if (
-        process.env.NODE_ENV !== 'production' &&
-        !firstUnmountRef.current
-      ) {
-        firstUnmountRef.current = true;
-        LOG(
-          'dev double-unmount guard: skipping disconnect on first cleanup'
-        );
-        // Still remove listeners and unload handler to avoid duplicates
-        off1();
-        off2();
-        off3();
-        off4();
-        off5();
-        off6();
-        off7();
-        window.removeEventListener('beforeunload', onBeforeUnload);
-        return;
-      }
-
-      // Real cleanup: remove listeners + beforeunload, then disconnect
+      LOG('Cleaning up socket listeners...');
       off1();
       off2();
       off3();
@@ -401,13 +406,12 @@ export default function RoomPage() {
       off5();
       off6();
       off7();
-      window.removeEventListener('beforeunload', onBeforeUnload);
-
-      LOG('cleanup → disconnect now');
-      socketService.disconnect(); // Safe to call multiple times
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metronomeLeaderSocketId, roomId, metronomeDataProducer?.id]);
+    
+    // This dependency array is correct. It ensures listeners are re-registered
+    // if the leader changes (for off5) or if the producer we are tracking changes (for off7).
+  }, [metronomeLeaderSocketId, metronomeDataProducer?.id]);
+
 
   // ────────────────────────────────────────────────────────────────────────────
   // Connect → join → load device → create recv transport
@@ -450,8 +454,7 @@ export default function RoomPage() {
         const {
           routerRtpCapabilities,
           existingProducers = [],
-          existingDataProducers = [],
-          // Snapshot of other participants at join time
+          existingDataProducers = [], // <-- This is new
           otherParticipantIds = [],
           metronomeLeaderSocketId: leaderId = null,
         } = reply;
@@ -501,8 +504,15 @@ export default function RoomPage() {
         setIsLeader(
           !!leaderId && leaderId === socketService.socket?.id
         );
-        // --- ADD THIS LOGIC ---
-        // Find and seed the metronome if it's already running
+        LOG(
+          'Leader? ',
+          leaderId,
+          'isLeader=',
+          !!leaderId &&
+            leaderId === socketService.socket?.id
+        );
+
+        // --- FIX: Seed the metronome if it already exists ---
         const leaderMetro = existingDataProducers.find(dp => 
           dp.label === 'metronome' && dp.ownerSocketId === leaderId
         );
@@ -514,7 +524,7 @@ export default function RoomPage() {
             ownerSocketId: leaderMetro.ownerSocketId
           });
         }
-        // --- END ADD ---
+        // --- END FIX ---
 
         setIsConnected(true);
       });

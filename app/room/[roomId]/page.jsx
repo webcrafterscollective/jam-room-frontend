@@ -10,7 +10,7 @@ const WARN = (...args) => console.warn('[ROOM]', ...args);
 const ERR = (...args) => console.error('[ROOM]', ...args);
 
 // -----------------------------------------------------------------------------
-// UI ICONS (Inlined SVGs for a modern look without new dependencies)
+// UI ICONS
 // -----------------------------------------------------------------------------
 const IconMic = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -59,31 +59,23 @@ const IconSpeaker = () => (
 );
 
 // -----------------------------------------------------------------------------
-// RemoteAudio Component (Redesigned)
+// RemoteAudio Component
+// --- MODIFIED: Added outputDeviceId prop ---
 // -----------------------------------------------------------------------------
-
-/**
- * RemoteAudio (Heavy Logging Version)
- *
- * This component is instrumented with detailed logs to debug
- * why audio might not be playing.
- */
-function RemoteAudio({ consumer }) {
+function RemoteAudio({ consumer, outputDeviceId }) {
   const audioRef = useRef(null);
 
   useEffect(() => {
     const el = audioRef.current;
     const track = consumer?.track;
-    const consumerId = consumer?.id; // Stable ID for logging
+    const consumerId = consumer?.id; 
 
-    // Log the state of props on every render
     LOG(`[RemoteAudio] effect running for ${consumerId}`, {
       hasElement: !!el,
       hasTrack: !!track,
       trackId: track?.id,
-      trackReadyState: track?.readyState, // EXPECT: "live"
-      trackKind: track?.kind,           // EXPECT: "audio"
-      trackEnabled: track?.enabled,       // EXPECT: true
+      trackReadyState: track?.readyState,
+      outputDeviceId, // <-- Log the new prop
     });
 
     if (!el || !track) {
@@ -92,8 +84,6 @@ function RemoteAudio({ consumer }) {
     }
 
     // --- Audio Element Event Listeners ---
-    // These will tell us exactly what the <audio> element is doing.
-
     const onPlay = () => LOG(`[RemoteAudio EVENT (${consumerId})] ✅ onPlay`, { currentTime: el.currentTime, paused: el.paused });
     const onPlaying = () => LOG(`[RemoteAudio EVENT (${consumerId})] ✅ onPlaying`, { volume: el.volume });
     const onPause = () => LOG(`[RemoteAudio EVENT (${consumerId})] ⏸️ onPause`);
@@ -101,16 +91,13 @@ function RemoteAudio({ consumer }) {
     const onSuspend = () => WARN(`[RemoteAudio EVENT (${consumerId})] ⚠️ onSuspend (loading suspended)`);
     const onAbort = () => ERR(`[RemoteAudio EVENT (${consumerId})] 🛑 onAbort (load aborted)`);
     const onCanPlay = () => LOG(`[RemoteAudio EVENT (${consumerId})] 👍 onCanPlay (ready to play)`);
-    
     const onError = () => {
       ERR(`[RemoteAudio EVENT (${consumerId})] 🛑 onError`, {
-        errorName: el.error?.name,       // e.g., "NotAllowedError"
-        errorMessage: el.error?.message, // **THIS IS THE MOST IMPORTANT LOG**
+        errorName: el.error?.name,
+        errorMessage: el.error?.message,
         errorCode: el.error?.code,
       });
     };
-
-    // Attach all event listeners
     el.addEventListener('play', onPlay);
     el.addEventListener('playing', onPlaying);
     el.addEventListener('pause', onPause);
@@ -122,18 +109,29 @@ function RemoteAudio({ consumer }) {
 
     // --- Attaching the Stream ---
     LOG(`[RemoteAudio] Attaching stream for ${consumerId}. Track readyState: ${track.readyState}`);
-    
     const stream = new MediaStream();
     stream.addTrack(track);
     el.srcObject = stream;
-    
     LOG(`[RemoteAudio] srcObject set for ${consumerId}. Track enabled: ${track.enabled}, muted: ${track.muted}`);
+
+    // --- NEW: Set Output Device (Speaker) ---
+    if (outputDeviceId && typeof el.setSinkId === 'function') {
+      el.setSinkId(outputDeviceId)
+        .then(() => {
+          LOG(`[RemoteAudio] Set output device OK: ${outputDeviceId}`);
+        })
+        .catch(err => {
+          ERR(`[RemoteAudio] Failed to set output device:`, err);
+        });
+    } else if (outputDeviceId) {
+      WARN('[RemoteAudio] el.setSinkId is not a function. Cannot set output device.');
+    }
+    // --- END NEW ---
 
     // --- Cleanup Function ---
     return () => {
       LOG(`[RemoteAudio] cleanup running for ${consumerId}`);
       if (el) {
-        // Remove all event listeners
         el.removeEventListener('play', onPlay);
         el.removeEventListener('playing', onPlaying);
         el.removeEventListener('pause', onPause);
@@ -142,15 +140,12 @@ function RemoteAudio({ consumer }) {
         el.removeEventListener('abort', onAbort);
         el.removeEventListener('canplay', onCanPlay);
         el.removeEventListener('error', onError);
-
-        // Detach the stream
         el.srcObject = null;
         LOG(`[RemoteAudio] cleanup complete for ${consumerId}`);
       }
     };
-  }, [consumer, consumer?.track]); // Dependencies are correct
+  }, [consumer, consumer?.track, outputDeviceId]); // <-- ADDED outputDeviceId to dependency array
 
-  // Redesigned "Channel Strip" UI
   return (
     <div className="bg-neutral-800 p-4 rounded-lg flex items-center justify-between gap-4 border border-neutral-700">
       <div className="flex items-center gap-3">
@@ -166,11 +161,47 @@ function RemoteAudio({ consumer }) {
           </p>
         </div>
       </div>
-      {/* This audio element is hidden but functional */}
       <audio ref={audioRef} autoPlay playsInline muted={false} />
     </div>
   );
 }
+
+// -----------------------------------------------------------------------------
+// Checkbox Component (Helper for new settings UI)
+// -----------------------------------------------------------------------------
+const SettingsCheckbox = ({ label, description, checked, onChange, disabled }) => (
+  <label className={`flex items-center gap-3 p-3 rounded-lg transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-neutral-800 cursor-pointer'}`}>
+    <input
+      type="checkbox"
+      className="w-5 h-5 rounded-md bg-neutral-700 border-neutral-600 text-indigo-500 focus:ring-indigo-500 focus:ring-2"
+      checked={checked}
+      onChange={onChange}
+      disabled={disabled}
+    />
+    <div>
+      <p className="text-sm font-medium text-neutral-200">{label}</p>
+      <p className="text-xs text-neutral-400">{description}</p>
+    </div>
+  </label>
+);
+
+// -----------------------------------------------------------------------------
+// Select Component (Helper for new settings UI)
+// -----------------------------------------------------------------------------
+const SettingsSelect = ({ label, value, onChange, disabled, children }) => (
+  <div className="p-3">
+    <label className="block text-sm font-medium text-neutral-200 mb-1">{label}</label>
+    <select
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      className="w-full bg-neutral-700 border border-neutral-600 text-neutral-200 rounded-md shadow-sm p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+    >
+      {children}
+    </select>
+  </div>
+);
+
 
 // -----------------------------------------------------------------------------
 // RoomPage Component (Main)
@@ -178,55 +209,88 @@ function RemoteAudio({ consumer }) {
 
 export default function RoomPage() {
   const params = useParams();
-  // Support both /room/[roomid] and /room/[roomId] route patterns
   const roomId = params.roomid || params.roomId;
 
   // ────────────────────────────────────────────────────────────────────────────
   // Connection / mediasoup state
   // ────────────────────────────────────────────────────────────────────────────
-
-  const [isConnected, setIsConnected] = useState(false); // Have we connected & joined the room?
-  const [localStream, setLocalStream] = useState(null);  // Local mic stream
-  const [myProducer, setMyProducer] = useState(null);    // Local audio Producer
-
-  // Participant list from SIGNALING (socket IDs, not mediasoup entities)
+  const [isConnected, setIsConnected] = useState(false);
+  const [localStream, setLocalStream] = useState(null);
+  const [myProducer, setMyProducer] = useState(null);
   const [participantIds, setParticipantIds] = useState([]);
-
-  // Audio producers in the room: Map<producerId, { kind, ownerSocketId }>
   const [availableProducers, setAvailableProducers] = useState(new Map());
-
-  // Active audio consumers: Map<producerId, { consumer }>
   const [consumingProducers, setConsumingProducers] = useState(new Map());
 
   // ────────────────────────────────────────────────────────────────────────────
   // Metronome (DataChannel) state
   // ────────────────────────────────────────────────────────────────────────────
-
-  const [metronomeLeaderSocketId, setMetronomeLeaderSocketId] = useState(null); // Who is allowed to drive metronome
-  const [isLeader, setIsLeader] = useState(false);                            // Is THIS client the leader?
-  const [metronomeDataProducer, setMetronomeDataProducer] = useState(null);     // { id, label, ownerSocketId }
-  const [isMetronomeConsuming, setIsMetronomeConsuming] = useState(false);    // Are we subscribed to DataChannel?
-  const [isMetronomeEnabled, setIsMetronomeEnabled] = useState(false);        // Local toggle to actually play clicks
-
-  // Web Audio bits for local click playback
-  const audioContextRef = useRef(null);       // Shared AudioContext
-  const clickBufferRef = useRef(null);        // Decoded click sound
-  const metronomeStateRef = useRef({ isEnabled: false }); // Mirror for callback closures
-
-  // Leader-side metronome sender: holds DataProducer + setInterval ref
+  const [metronomeLeaderSocketId, setMetronomeLeaderSocketId] = useState(null);
+  const [isLeader, setIsLeader] = useState(false);
+  const [metronomeDataProducer, setMetronomeDataProducer] = useState(null);
+  const [isMetronomeConsuming, setIsMetronomeConsuming] = useState(false);
+  const [isMetronomeEnabled, setIsMetronomeEnabled] = useState(false);
+  const audioContextRef = useRef(null);
+  const clickBufferRef = useRef(null);
+  const metronomeStateRef = useRef({ isEnabled: false });
   const metronomeSenderRef = useRef({ dp: null, interval: null });
-
-  // React 18 dev double-unmount guard (for effects in StrictMode)
   const firstUnmountRef = useRef(false);
 
   // ────────────────────────────────────────────────────────────────────────────
-  // --- FIX: useEffect 1 (Boot & Lifecycle) ---
-  //
-  // Responsibilities:
-  //   • Runs ONCE on mount.
-  //   • Create AudioContext and decode /click.mp3
-  //   • Handle window.beforeunload to best-effort disconnect
-  //   • On cleanup: remove listeners and disconnect (with dev-mode guard)
+  // --- NEW: Audio Control State ---
+  // ────────────────────────────────────────────────────────────────────────────
+  
+  // Device Lists
+  const [inputDevices, setInputDevices] = useState([]);
+  const [outputDevices, setOutputDevices] = useState([]);
+
+  // Selected Device IDs
+  const [selectedInputId, setSelectedInputId] = useState('');
+  const [selectedOutputId, setSelectedOutputId] = useState('');
+
+  // getUserMedia constraints
+  const [echoCancellation, setEchoCancellation] = useState(true);
+  const [noiseSuppression, setNoiseSuppression] = useState(true);
+  const [autoGainControl, setAutoGainControl] = useState(true);
+  const [sampleRate, setSampleRate] = useState('48000');
+  const [latency, setLatency] = useState('0.01'); // 10ms 'interactive' hint
+
+  // Mediasoup Opus codec controls
+  const [opusStereo, setOpusStereo] = useState(true);
+  const [opusDtx, setOpusDtx] = useState(false);
+  const [opusFec, setOpusFec] = useState(true);
+  
+  // ────────────────────────────────────────────────────────────────────────────
+  // --- NEW: Helper Function to Get Audio Devices ---
+  // ────────────────────────────────────────────────────────────────────────────
+  const updateAudioDevices = async () => {
+    try {
+      LOG('Updating audio devices...');
+      await navigator.mediaDevices.getUserMedia({ audio: true }); // Request permission first
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      
+      const inputs = devices.filter(d => d.kind === 'audioinput');
+      const outputs = devices.filter(d => d.kind === 'audiooutput');
+
+      setInputDevices(inputs);
+      setOutputDevices(outputs);
+
+      // Set default selection
+      if (!selectedInputId && inputs.length > 0) {
+        setSelectedInputId(inputs[0].deviceId);
+      }
+      if (!selectedOutputId && outputs.length > 0) {
+        setSelectedOutputId(outputs[0].deviceId);
+      }
+      LOG(`Devices found: ${inputs.length} inputs, ${outputs.length} outputs`);
+    } catch (err) {
+      ERR('Error enumerating devices:', err);
+      // This often happens if user denies mic permission
+    }
+  };
+
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // --- useEffect 1 (Boot & Lifecycle) ---
   // ────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     LOG('boot useEffect start', {
@@ -236,12 +300,10 @@ export default function RoomPage() {
       roomId,
     });
 
-    // Create Web Audio context
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     audioContextRef.current = ctx;
     LOG('AudioContext state', ctx.state);
 
-    // Load and decode metronome click sample
     (async () => {
       try {
         const res = await fetch('/click.mp3');
@@ -253,19 +315,14 @@ export default function RoomPage() {
       }
     })();
 
-    // Disconnect socket when tab is closing (best-effort)
     const onBeforeUnload = () => {
       LOG('beforeunload → disconnect');
       socketService.disconnect();
     };
     window.addEventListener('beforeunload', onBeforeUnload);
 
-    // Cleanup with React 18 dev double-unmount guard
     return () => {
       LOG('boot useEffect cleanup start');
-
-      // In development, React StrictMode mounts/unmounts twice.
-      // We ignore the first cleanup to avoid disconnecting too early.
       if (
         process.env.NODE_ENV !== 'production' &&
         !firstUnmountRef.current
@@ -277,38 +334,26 @@ export default function RoomPage() {
         window.removeEventListener('beforeunload', onBeforeUnload);
         return;
       }
-
-      // Real cleanup: remove listeners + beforeunload, then disconnect
       window.removeEventListener('beforeunload', onBeforeUnload);
-
       LOG('cleanup → disconnect now');
-      socketService.disconnect(); // Safe to call multiple times
+      socketService.disconnect(); 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId]); // This effect should ONLY run once based on roomId.
+  }, [roomId]); 
 
   // ────────────────────────────────────────────────────────────────────────────
-  // --- FIX: useEffect 2 (Socket Listeners) ---
-  //
-  // Responsibilities:
-  //   • Runs after boot.
-  //   • Re-runs when state it depends on changes (e.g., metronomeLeaderSocketId).
-  //   • Registers all socket event listeners.
-  //   • On cleanup: *only* removes the listeners it registered.
+  // --- useEffect 2 (Socket Listeners) ---
   // ────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     LOG('Registering socket listeners...', { metronomeLeaderSocketId, metronomeDataProducerId: metronomeDataProducer?.id });
 
-    // Socket listeners — registered via service so they persist across reconnects
     const off1 = socketService.onParticipantJoined(({ socketId }) => {
       LOG('[SOCKET] participantJoined', socketId);
-      // Add new joiner to participant list
       setParticipantIds((prev) => [...prev, socketId]);
     });
 
     const off2 = socketService.onParticipantLeft(({ socketId }) => {
       LOG('[SOCKET] participantLeft', socketId);
-      // Remove leaving participant
       setParticipantIds((prev) => prev.filter((id) => id !== socketId));
     });
 
@@ -329,25 +374,18 @@ export default function RoomPage() {
 
     const off4 = socketService.onMediaProducerClosed(({ producerId }) => {
       LOG('[SOCKET] mediaProducerClosed', producerId);
-
-      // Remove from availableProducers snapshot
       setAvailableProducers((prev) => {
         const next = new Map(prev);
         next.delete(producerId);
         return next;
       });
-
-      // If we were consuming this producer, close local Consumer and remove
       setConsumingProducers((prev) => {
         const next = new Map(prev);
         const entry = next.get(producerId);
         if (entry?.consumer) {
           try {
             entry.consumer.close();
-            LOG(
-              'Closed local consumer due to remote producer close',
-              producerId
-            );
+            LOG('Closed local consumer due to remote producer close', producerId);
           } catch (e) {
             WARN('Error closing consumer on producerClose', e);
           }
@@ -357,46 +395,36 @@ export default function RoomPage() {
       });
     });
 
-    // This listener's callback needs the *current* metronomeLeaderSocketId,
-    // which is why this entire effect hook re-runs when it changes.
     const off5 = socketService.onDataProducerCreated(
       ({ dataProducerId, label, ownerSocketId }) => {
         LOG('[SOCKET] dataProducerCreated', {
           dataProducerId,
           label,
           ownerSocketId,
-          leader: metronomeLeaderSocketId, // This value is now fresh
+          leader: metronomeLeaderSocketId,
         });
-        // Only track the leader’s metronome DataProducer
         if (label === 'metronome' && ownerSocketId === metronomeLeaderSocketId) {
           setMetronomeDataProducer({ id: dataProducerId, label, ownerSocketId });
         }
       }
     );
 
-    // Listener for when the server assigns a new leader
     const off6 = socketService.on('newMetronomeLeader', ({ leaderSocketId }) => {
       LOG('[SOCKET] newMetronomeLeader', leaderSocketId);
       setMetronomeLeaderSocketId(leaderSocketId);
       setIsLeader(!!leaderSocketId && leaderSocketId === socketService.socket?.id);
-      
-      // Reset metronome state. We are now waiting for the NEW leader
-      // to start their producer.
       setIsMetronomeConsuming(false);
       setMetronomeDataProducer(null);
     });
 
-    // Listener for when the data producer (metronome) is closed
     const off7 = socketService.on('dataProducerClosed', ({ dataProducerId }) => {
       LOG('[SOCKET] dataProducerClosed', dataProducerId);
-      // If the closed data producer is the one we were tracking, clear it.
       if (metronomeDataProducer?.id === dataProducerId) {
         setMetronomeDataProducer(null);
         setIsMetronomeConsuming(false);
       }
     });
 
-    // Cleanup function for THIS effect: *only* remove listeners
     return () => {
       LOG('Cleaning up socket listeners...');
       off1();
@@ -407,9 +435,6 @@ export default function RoomPage() {
       off6();
       off7();
     };
-    
-    // This dependency array is correct. It ensures listeners are re-registered
-    // if the leader changes (for off5) or if the producer we are tracking changes (for off7).
   }, [metronomeLeaderSocketId, metronomeDataProducer?.id]);
 
 
@@ -432,7 +457,6 @@ export default function RoomPage() {
         socketService.socket?.id
       );
 
-      // Extra logs for client-side socket events
       socketService.socket?.on('disconnect', (r) =>
         LOG('[client] disconnect:', r)
       );
@@ -443,7 +467,6 @@ export default function RoomPage() {
         LOG('[client] reconnect attempt:', n)
       );
 
-      // Join the room once connected
       socketService.joinRoom(roomId, async (reply) => {
         LOG('joinRoom reply:', reply);
         if (reply?.error) {
@@ -454,12 +477,11 @@ export default function RoomPage() {
         const {
           routerRtpCapabilities,
           existingProducers = [],
-          existingDataProducers = [], // <-- This is new
+          existingDataProducers = [], 
           otherParticipantIds = [],
           metronomeLeaderSocketId: leaderId = null,
         } = reply;
 
-        // Seed participant list from server snapshot
         setParticipantIds(otherParticipantIds || []);
 
         LOG('Joined room snapshot', {
@@ -468,7 +490,6 @@ export default function RoomPage() {
           existingProducersCount: existingProducers.length,
         });
 
-        // Load mediasoup Device with router capabilities
         try {
           await mediasoupService.loadDevice(routerRtpCapabilities);
           LOG('Mediasoup device loaded');
@@ -477,7 +498,6 @@ export default function RoomPage() {
           return;
         }
 
-        // Create recv transport for consuming remote audio
         try {
           await mediasoupService.createRecvTransport();
           LOG('Receive transport created');
@@ -486,7 +506,6 @@ export default function RoomPage() {
           return;
         }
 
-        // Seed audio producers snapshot: only audio kind
         const seeded = new Map();
         for (const p of existingProducers) {
           if (p.kind === 'audio') {
@@ -499,7 +518,6 @@ export default function RoomPage() {
         setAvailableProducers(seeded);
         LOG('Seeded availableProducers:', Array.from(seeded.keys()));
 
-        // Leader info — used for DataChannel metronome
         setMetronomeLeaderSocketId(leaderId);
         setIsLeader(
           !!leaderId && leaderId === socketService.socket?.id
@@ -512,7 +530,6 @@ export default function RoomPage() {
             leaderId === socketService.socket?.id
         );
 
-        // --- FIX: Seed the metronome if it already exists ---
         const leaderMetro = existingDataProducers.find(dp => 
           dp.label === 'metronome' && dp.ownerSocketId === leaderId
         );
@@ -524,7 +541,6 @@ export default function RoomPage() {
             ownerSocketId: leaderMetro.ownerSocketId
           });
         }
-        // --- END FIX ---
 
         setIsConnected(true);
       });
@@ -532,25 +548,39 @@ export default function RoomPage() {
   };
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Producer (mic) — capture + send local audio to SFU
+  // Producer (mic)
+  // --- MODIFIED: Uses all new audio settings ---
   // ────────────────────────────────────────────────────────────────────────────
   const handleGetMic = async () => {
     LOG('Get microphone clicked');
 
     try {
-      // Resume AudioContext on user gesture to comply with autoplay policies
       if (audioContextRef.current?.state === 'suspended') {
         await audioContextRef.current.resume();
         LOG('AudioContext resumed on mic grant');
       }
 
-      // Request microphone capture
+      // --- NEW: Populate devices on first click ---
+      // This is the first time we are allowed to ask for device lists
+      if (inputDevices.length === 0) {
+        await updateAudioDevices();
+      }
+      
+      const audioConstraints = {
+        echoCancellation: echoCancellation,
+        noiseSuppression: noiseSuppression,
+        autoGainControl: autoGainControl,
+        // Use selected deviceId if available
+        deviceId: selectedInputId ? { exact: selectedInputId } : undefined,
+        // Add advanced constraints
+        sampleRate: { ideal: parseInt(sampleRate, 10) },
+        latency: parseFloat(latency)
+      };
+      
+      LOG('Requesting microphone with constraints:', audioConstraints);
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        audio: audioConstraints,
       });
 
       setLocalStream(stream);
@@ -560,6 +590,7 @@ export default function RoomPage() {
       );
     } catch (err) {
       ERR('Error getting microphone:', err);
+      alert(`Error getting mic: ${err.message}. Your hardware might not support the selected settings.`);
     }
   };
 
@@ -569,18 +600,20 @@ export default function RoomPage() {
       alert('Get microphone first');
       return;
     }
-
     LOG('StartProducing…');
-
     try {
-      // Ensure send transport is up and DTLS-connected
       await mediasoupService.createSendTransport();
       LOG('Send transport ready');
-
       const track = localStream.getAudioTracks()[0];
-      const producer = await mediasoupService.produce(track);
-      setMyProducer(producer);
 
+      // Pass the Opus codec settings from our state
+      const producer = await mediasoupService.produce(track, {
+        opusStereo: opusStereo,
+        opusDtx: opusDtx,
+        opusFec: opusFec,
+      });
+      
+      setMyProducer(producer);
       LOG('Producing audio; producerId=', producer?.id);
     } catch (e) {
       ERR('StartProducing failed', e);
@@ -589,25 +622,28 @@ export default function RoomPage() {
 
   const handleStopProducing = () => {
     if (!myProducer) return;
-
     LOG('StopProducing; closing producer', myProducer.id);
-    try {
-      myProducer.close();
-    } catch (e) {
-      WARN('producer.close error', e);
-    }
+    try { myProducer.close(); } catch (e) { WARN('producer.close error', e); }
     setMyProducer(null);
+
+    // Stop and clear the local stream
+    // This allows user to click "Get Microphone" again with new settings
+    try {
+      localStream?.getTracks().forEach(track => track.stop());
+    } catch (e) {
+      WARN('localStream.stop error', e);
+    }
+    setLocalStream(null);
   };
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Consumers (audio) — listen to other jammers
+  // Consumers (audio)
   // ────────────────────────────────────────────────────────────────────────────
   const handleConsume = async (producerId) => {
     LOG('Consume clicked for', producerId);
     try {
-      const consumer = await mediasoupService.consume(producerId); //
+      const consumer = await mediasoupService.consume(producerId);
 
-      // --- NEW LOGGING ---
       if (!consumer) {
         WARN('mediasoupService.consume returned null for', producerId);
         return;
@@ -616,14 +652,10 @@ export default function RoomPage() {
         consumerId: consumer.id,
         producerId: consumer.producerId,
         kind: consumer.kind,
-        paused: consumer.paused, // Should be false (or true initially, then resumes)
+        paused: consumer.paused, 
         trackId: consumer.track?.id,
-        trackReadyState: consumer.track?.readyState, // EXPECT: "live"
+        trackReadyState: consumer.track?.readyState,
       });
-      // --- END NEW LOGGING ---
-      
-      // Note: The `resume` is now handled inside MediasoupService.js
-      // by calling `socketService.resumeConsumer`
       
       setConsumingProducers((prev) => {
         const next = new Map(prev);
@@ -637,19 +669,17 @@ export default function RoomPage() {
   };
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Metronome (DataChannel) — leader sends ticks, everyone else plays clicks
+  // Metronome (DataChannel)
   // ────────────────────────────────────────────────────────────────────────────
   const playClick = () => {
     if (!audioContextRef.current || !clickBufferRef.current) {
       WARN('playClick called without audioContext or buffer');
       return;
     }
-
     const state = audioContextRef.current.state;
     if (state === 'suspended') {
       LOG('AudioContext is suspended; click may be silent until resume()');
     }
-
     const src = audioContextRef.current.createBufferSource();
     src.buffer = clickBufferRef.current;
     src.connect(audioContextRef.current.destination);
@@ -660,33 +690,22 @@ export default function RoomPage() {
     LOG('[ROOM] startLeaderMetronome request; isLeader?', isLeader, 'bpm', bpm);
     if (!isLeader)
       return alert('Only the leader can start the metronome.');
-
-    // Ensure send transport exists for DataChannel
     await mediasoupService.createSendTransport();
-
-    // Avoid starting multiple intervals/DataProducers
     if (metronomeSenderRef.current.dp) {
       LOG('[ROOM] leader metronome already running; ignoring');
       return;
     }
-
-    // createDataProducer resolves when channel is open
     const dp = await mediasoupService.createDataProducer({
       label: 'metronome',
       protocol: 'json',
     });
     LOG('[ROOM] leader DataProducer ready', dp.id, dp.readyState);
     metronomeSenderRef.current.dp = dp;
-
-    const periodMs = Math.max(1, Math.floor(60000 / bpm)); // ms per beat
-
+    const periodMs = Math.max(1, Math.floor(60000 / bpm)); 
     metronomeSenderRef.current.interval = setInterval(() => {
       try {
         if (dp.readyState !== 'open') {
-          WARN(
-            '[ROOM] metronome send skipped; channel not open. state=',
-            dp.readyState
-          );
+          WARN('[ROOM] metronome send skipped; channel not open. state=', dp.readyState);
           return;
         }
         const msg = { type: 'tick', at: Date.now() };
@@ -695,29 +714,20 @@ export default function RoomPage() {
         ERR('[ROOM] metronome send failed', e);
       }
     }, periodMs);
-
     LOG('[ROOM] metronome interval started', { bpm, periodMs });
   };
 
   const stopLeaderMetronome = () => {
     LOG('[ROOM] stopLeaderMetronome called');
-
     const { dp, interval } = metronomeSenderRef.current;
     if (interval) clearInterval(interval);
     metronomeSenderRef.current.interval = null;
-
     if (dp) {
-      try {
-        dp.close?.();
-      } catch (e) {
-        WARN('[ROOM] dp.close error', e);
-      }
+      try { dp.close?.(); } catch (e) { WARN('[ROOM] dp.close error', e); }
     }
-
     metronomeSenderRef.current.dp = null;
   };
 
-  // Subscribe to leader's metronome data channel if everything is ready
   const subscribeMetronomeIfReady = async () => {
     if (!metronomeDataProducer?.id) {
       LOG('subscribeMetronomeIfReady: no metronomeDataProducer yet');
@@ -727,62 +737,38 @@ export default function RoomPage() {
       LOG('subscribeMetronomeIfReady: already consuming data');
       return;
     }
-
     LOG('Subscribing to metronome data…', metronomeDataProducer.id);
-
     await mediasoupService.consumeData(
       metronomeDataProducer.id,
       async (msg) => {
-        // Only handle tick messages while our local toggle is ON
-        if (
-          msg?.type === 'tick' &&
-          metronomeStateRef.current.isEnabled
-        ) {
-          // Ensure AudioContext is running before playing click
+        if (msg?.type === 'tick' && metronomeStateRef.current.isEnabled) {
           if (audioContextRef.current?.state === 'suspended') {
-            try {
-              await audioContextRef.current.resume();
-              LOG('AudioContext resumed for click');
-            } catch {
-              // ignore resume errors
-            }
+            try { await audioContextRef.current.resume(); LOG('AudioContext resumed for click'); } catch {}
           }
           playClick();
         }
       }
     );
-
     setIsMetronomeConsuming(true);
   };
 
-  // Auto-subscribe whenever metronome is enabled and we have a data producer
   useEffect(() => {
     LOG('metronome effect', {
       isMetronomeEnabled,
       metronomeDataProducerId: metronomeDataProducer?.id,
     });
-
     if (isMetronomeEnabled) subscribeMetronomeIfReady();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMetronomeEnabled, metronomeDataProducer?.id]);
 
-  // Toggle local metronome playback on/off
   const handleToggleMetronome = async () => {
     const next = !isMetronomeEnabled;
     LOG('Toggle metronome →', next);
-
     setIsMetronomeEnabled(next);
     metronomeStateRef.current.isEnabled = next;
-
     if (next) {
-      // On enabling, make sure AudioContext is running
       if (audioContextRef.current?.state === 'suspended') {
-        try {
-          await audioContextRef.current.resume();
-          LOG('AudioContext resumed on toggle');
-        } catch {
-          // ignore
-        }
+        try { await audioContextRef.current.resume(); LOG('AudioContext resumed on toggle'); } catch {}
       }
       await subscribeMetronomeIfReady();
     }
@@ -869,34 +855,166 @@ export default function RoomPage() {
               </Button>
             </Card>
 
-            <Card title="My Microphone" icon={<IconMic />} className={!isConnected ? 'pointer-events-none' : ''}>
-              <Button
-                onClick={handleGetMic}
-                disabled={!isConnected || !!localStream}
-                className="bg-blue-600 hover:bg-blue-500"
-                icon={<IconMicOff />}
+            {/* --- MODIFIED: Renamed Card --- */}
+            <Card title="Local Audio Settings" icon={<IconMic />} className={!isConnected ? 'pointer-events-none' : ''}>
+              
+              {/* --- NEW: Device Selectors --- */}
+              <SettingsSelect
+                label="Input Device (Microphone)"
+                value={selectedInputId}
+                onChange={(e) => setSelectedInputId(e.target.value)}
+                disabled={!!localStream || inputDevices.length === 0}
               >
-                {localStream ? 'Mic Active' : 'Get Microphone'}
-              </Button>
+                {inputDevices.length === 0 && <option>Click "Get Mic" to populate</option>}
+                {inputDevices.map(d => (
+                  <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
+                ))}
+              </SettingsSelect>
+              
+              <SettingsSelect
+                label="Output Device (Speakers)"
+                value={selectedOutputId}
+                onChange={(e) => setSelectedOutputId(e.target.value)}
+                disabled={outputDevices.length === 0}
+              >
+                {outputDevices.length === 0 && <option>Click "Get Mic" to populate</option>}
+                {outputDevices.map(d => (
+                  <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
+                ))}
+              </SettingsSelect>
+              <p className="text-xs text-neutral-400 px-3 -mt-2">
+                Note: Metronome audio always uses the system default output.
+              </p>
+              {/* --- END NEW --- */}
 
-              {!myProducer ? (
+
+              <div className="pt-4 border-t border-neutral-700 space-y-3">
                 <Button
-                  onClick={handleStartProducing}
-                  disabled={!isConnected || !localStream}
-                  className="bg-green-600 hover:bg-green-500"
-                  icon={<IconPlay />}
+                  onClick={handleGetMic}
+                  disabled={!isConnected || !!localStream}
+                  className="bg-blue-600 hover:bg-blue-500"
+                  icon={<IconMicOff />}
                 >
-                  Start Producing
+                  {localStream ? 'Mic Active' : 'Get Microphone'}
                 </Button>
-              ) : (
-                <Button
-                  onClick={handleStopProducing}
-                  className="bg-red-600 hover:bg-red-500"
-                  icon={<IconStop />}
+
+                {!myProducer ? (
+                  <Button
+                    onClick={handleStartProducing}
+                    disabled={!isConnected || !localStream}
+                    className="bg-green-600 hover:bg-green-500"
+                    icon={<IconPlay />}
+                  >
+                    Start Producing
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleStopProducing}
+                    className="bg-red-600 hover:bg-red-500"
+                    icon={<IconStop />}
+                  >
+                    Stop Producing
+                  </Button>
+                )}
+              </div>
+              
+              <div className="pt-4 border-t border-neutral-700 space-y-1">
+                <h3 className="text-sm font-medium text-neutral-300 px-3 pb-2">
+                  Mic Processing
+                </h3>
+                <SettingsCheckbox
+                  label="Echo Cancellation"
+                  description="Recommended without headphones"
+                  checked={echoCancellation}
+                  onChange={(e) => setEchoCancellation(e.target.checked)}
+                  disabled={!!localStream}
+                />
+                <SettingsCheckbox
+                  label="Noise Suppression"
+                  description="Filters out background noise"
+                  checked={noiseSuppression}
+                  onChange={(e) => setNoiseSuppression(e.target.checked)}
+                  disabled={!!localStream}
+                />
+                <SettingsCheckbox
+                  label="Auto Gain Control"
+                  description="Adjusts mic volume automatically"
+                  checked={autoGainControl}
+                  onChange={(e) => setAutoGainControl(e.target.checked)}
+                  disabled={!!localStream}
+                />
+                {!!localStream && (
+                  <p className="text-xs text-indigo-300 px-3 pt-2">
+                    Stop your mic to change these settings.
+                  </p>
+                )}
+              </div>
+              
+              {/* --- NEW: Advanced Sample Rate / Latency --- */}
+              <div className="pt-4 border-t border-neutral-700 space-y-1">
+                <h3 className="text-sm font-medium text-neutral-300 px-3 pb-2">
+                  Mic Quality (Advanced)
+                </h3>
+                <SettingsSelect
+                  label="Sample Rate (Request)"
+                  value={sampleRate}
+                  onChange={(e) => setSampleRate(e.target.value)}
+                  disabled={!!localStream}
                 >
-                  Stop Producing
-                </Button>
-              )}
+                  <option value="48000">48000 Hz (Pro Audio)</option>
+                  <option value="44100">44100 Hz (CD Quality)</option>
+                  <option value="16000">16000 Hz (Speech)</option>
+                </SettingsSelect>
+                <SettingsSelect
+                  label="Buffer Size / Latency (Hint)"
+                  value={latency}
+                  onChange={(e) => setLatency(e.target.value)}
+                  disabled={!!localStream}
+                >
+                  <option value="0">0 (Browser Default)</option>
+                  <option value="0.005">0.005s (Lowest Latency)</option>
+                  <option value="0.01">0.01s (Interactive)</option>
+                  <option value="0.02">0.02s (Stable)</option>
+                </SettingsSelect>
+                {!!localStream && (
+                  <p className="text-xs text-indigo-300 px-3 pt-2">
+                    Stop your mic to change these settings.
+                  </p>
+                )}
+              </div>
+
+              <div className="pt-4 border-t border-neutral-700 space-y-1">
+                <h3 className="text-sm font-medium text-neutral-300 px-3 pb-2">
+                  Codec Quality (Advanced)
+                </h3>
+                <SettingsCheckbox
+                  label="Stereo Audio"
+                  description="Send 2 channels (music)"
+                  checked={opusStereo}
+                  onChange={(e) => setOpusStereo(e.target.checked)}
+                  disabled={!!myProducer}
+                />
+                <SettingsCheckbox
+                  label="Forward Error Correction (FEC)"
+                  description="Better quality on bad networks"
+                  checked={opusFec}
+                  onChange={(e) => setOpusFec(e.target.checked)}
+                  disabled={!!myProducer}
+                />
+                <SettingsCheckbox
+                  label="Discontinuous Transmission (DTX)"
+                  description="Stops sending on silence (bad for music)"
+                  checked={opusDtx}
+                  onChange={(e) => setOpusDtx(e.target.checked)}
+                  disabled={!!myProducer}
+                />
+                {!!myProducer && (
+                  <p className="text-xs text-indigo-300 px-3 pt-2">
+                    Stop producing to change codec settings.
+                  </p>
+                )}
+              </div>
+
             </Card>
 
             <Card title="Metronome" icon={<IconMetronome />} className={!isConnected ? 'pointer-events-none' : ''}>
@@ -950,6 +1068,7 @@ export default function RoomPage() {
                     <RemoteAudio
                       key={producerId}
                       consumer={consumer}
+                      outputDeviceId={selectedOutputId} // <-- Pass the selected output
                     />
                   )
                 )}

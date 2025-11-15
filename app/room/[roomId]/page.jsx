@@ -57,10 +57,19 @@ const IconSpeaker = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
   </svg>
 );
+const IconVideo = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+    <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+  </svg>
+);
+const IconVideoOff = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+    <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M12 18.75h-7.5a2.25 2.25 0 0 1-2.25-2.25v-9A2.25 2.25 0 0 1 4.5 5.25H9M18 18.75h-7.5a2.25 2.25 0 0 1-2.25-2.25v-9A2.25 2.25 0 0 1 10.5 5.25H18M3 3l18 18" />
+  </svg>
+);
 
 // -----------------------------------------------------------------------------
 // RemoteAudio Component
-// --- MODIFIED: Added outputDeviceId prop ---
 // -----------------------------------------------------------------------------
 function RemoteAudio({ consumer, outputDeviceId }) {
   const audioRef = useRef(null);
@@ -70,104 +79,94 @@ function RemoteAudio({ consumer, outputDeviceId }) {
     const track = consumer?.track;
     const consumerId = consumer?.id; 
 
+    if (!el || !track) return;
+
     LOG(`[RemoteAudio] effect running for ${consumerId}`, {
-      hasElement: !!el,
-      hasTrack: !!track,
-      trackId: track?.id,
-      trackReadyState: track?.readyState,
-      outputDeviceId, // <-- Log the new prop
+      trackId: track.id,
+      trackReadyState: track.readyState,
+      outputDeviceId,
     });
 
-    if (!el || !track) {
-      LOG(`[RemoteAudio] effect cleanup for ${consumerId}: No element or track. Bailing.`);
-      return;
-    }
-
-    // --- Audio Element Event Listeners ---
-    const onPlay = () => LOG(`[RemoteAudio EVENT (${consumerId})] ✅ onPlay`, { currentTime: el.currentTime, paused: el.paused });
-    const onPlaying = () => LOG(`[RemoteAudio EVENT (${consumerId})] ✅ onPlaying`, { volume: el.volume });
-    const onPause = () => LOG(`[RemoteAudio EVENT (${consumerId})] ⏸️ onPause`);
-    const onStalled = () => WARN(`[RemoteAudio EVENT (${consumerId})] ⚠️ onStalled (network issue?)`);
-    const onSuspend = () => WARN(`[RemoteAudio EVENT (${consumerId})] ⚠️ onSuspend (loading suspended)`);
-    const onAbort = () => ERR(`[RemoteAudio EVENT (${consumerId})] 🛑 onAbort (load aborted)`);
-    const onCanPlay = () => LOG(`[RemoteAudio EVENT (${consumerId})] 👍 onCanPlay (ready to play)`);
-    const onError = () => {
-      ERR(`[RemoteAudio EVENT (${consumerId})] 🛑 onError`, {
-        errorName: el.error?.name,
-        errorMessage: el.error?.message,
-        errorCode: el.error?.code,
-      });
-    };
-    el.addEventListener('play', onPlay);
+    const onPlaying = () => LOG(`[RemoteAudio EVENT (${consumerId})] ✅ onPlaying`);
+    const onError = () => ERR(`[RemoteAudio EVENT (${consumerId})] 🛑 onError`, { error: el.error });
     el.addEventListener('playing', onPlaying);
-    el.addEventListener('pause', onPause);
-    el.addEventListener('stalled', onStalled);
-    el.addEventListener('suspend', onSuspend);
-    el.addEventListener('abort', onAbort);
-    el.addEventListener('canplay', onCanPlay);
     el.addEventListener('error', onError);
 
-    // --- Attaching the Stream ---
-    LOG(`[RemoteAudio] Attaching stream for ${consumerId}. Track readyState: ${track.readyState}`);
     const stream = new MediaStream();
     stream.addTrack(track);
     el.srcObject = stream;
-    LOG(`[RemoteAudio] srcObject set for ${consumerId}. Track enabled: ${track.enabled}, muted: ${track.muted}`);
 
-    // --- NEW: Set Output Device (Speaker) ---
     if (outputDeviceId && typeof el.setSinkId === 'function') {
       el.setSinkId(outputDeviceId)
-        .then(() => {
-          LOG(`[RemoteAudio] Set output device OK: ${outputDeviceId}`);
-        })
-        .catch(err => {
-          ERR(`[RemoteAudio] Failed to set output device:`, err);
-        });
-    } else if (outputDeviceId) {
-      WARN('[RemoteAudio] el.setSinkId is not a function. Cannot set output device.');
+        .catch(err => ERR(`[RemoteAudio] Failed to set output device:`, err));
     }
-    // --- END NEW ---
 
-    // --- Cleanup Function ---
     return () => {
       LOG(`[RemoteAudio] cleanup running for ${consumerId}`);
       if (el) {
-        el.removeEventListener('play', onPlay);
         el.removeEventListener('playing', onPlaying);
-        el.removeEventListener('pause', onPause);
-        el.removeEventListener('stalled', onStalled);
-        el.removeEventListener('suspend', onSuspend);
-        el.removeEventListener('abort', onAbort);
-        el.removeEventListener('canplay', onCanPlay);
         el.removeEventListener('error', onError);
         el.srcObject = null;
-        LOG(`[RemoteAudio] cleanup complete for ${consumerId}`);
       }
     };
-  }, [consumer, consumer?.track, outputDeviceId]); // <-- ADDED outputDeviceId to dependency array
+  }, [consumer, consumer?.track, outputDeviceId]);
 
   return (
-    <div className="bg-neutral-800 p-4 rounded-lg flex items-center justify-between gap-4 border border-neutral-700">
-      <div className="flex items-center gap-3">
-        <div className="text-green-500 flex-shrink-0">
-          <IconSpeaker />
-        </div>
-        <div>
-          <p className="text-sm font-medium text-neutral-200">
-            Jammer
-          </p>
-          <p className="text-xs font-mono text-neutral-400 break-all">
-            {consumer?.producerId}
-          </p>
-        </div>
-      </div>
-      <audio ref={audioRef} autoPlay playsInline muted={false} />
-    </div>
+    // This element is hidden. The <RemoteJammer> component provides the UI.
+    <audio ref={audioRef} autoPlay playsInline muted={false} />
   );
 }
 
 // -----------------------------------------------------------------------------
-// Checkbox Component (Helper for new settings UI)
+// --- NEW: RemoteVideo Component ---
+// -----------------------------------------------------------------------------
+function RemoteVideo({ consumer }) {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    const track = consumer?.track;
+    const consumerId = consumer?.id;
+
+    if (!el || !track) return;
+
+    LOG(`[RemoteVideo] effect running for ${consumerId}`, {
+      trackId: track.id,
+      trackReadyState: track.readyState,
+    });
+
+    const onPlaying = () => LOG(`[RemoteVideo EVENT (${consumerId})] ✅ onPlaying`);
+    const onError = () => ERR(`[RemoteVideo EVENT (${consumerId})] 🛑 onError`, { error: el.error });
+    el.addEventListener('playing', onPlaying);
+    el.addEventListener('error', onError);
+
+    const stream = new MediaStream();
+    stream.addTrack(track);
+    el.srcObject = stream;
+
+    return () => {
+      LOG(`[RemoteVideo] cleanup running for ${consumerId}`);
+      if (el) {
+        el.removeEventListener('playing', onPlaying);
+        el.removeEventListener('error', onError);
+        el.srcObject = null;
+      }
+    };
+  }, [consumer, consumer?.track]);
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted // Remote video should be muted; audio comes from <RemoteAudio>
+      className="w-full h-full object-cover"
+    />
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Checkbox Component
 // -----------------------------------------------------------------------------
 const SettingsCheckbox = ({ label, description, checked, onChange, disabled }) => (
   <label className={`flex items-center gap-3 p-3 rounded-lg transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-neutral-800 cursor-pointer'}`}>
@@ -186,7 +185,7 @@ const SettingsCheckbox = ({ label, description, checked, onChange, disabled }) =
 );
 
 // -----------------------------------------------------------------------------
-// Select Component (Helper for new settings UI)
+// Select Component
 // -----------------------------------------------------------------------------
 const SettingsSelect = ({ label, value, onChange, disabled, children }) => (
   <div className="p-3">
@@ -202,7 +201,6 @@ const SettingsSelect = ({ label, value, onChange, disabled, children }) => (
   </div>
 );
 
-
 // -----------------------------------------------------------------------------
 // RoomPage Component (Main)
 // -----------------------------------------------------------------------------
@@ -212,17 +210,30 @@ export default function RoomPage() {
   const roomId = params.roomid || params.roomId;
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Connection / mediasoup state
+  // Core State
   // ────────────────────────────────────────────────────────────────────────────
   const [isConnected, setIsConnected] = useState(false);
-  const [localStream, setLocalStream] = useState(null);
-  const [myProducer, setMyProducer] = useState(null);
   const [participantIds, setParticipantIds] = useState([]);
-  const [availableProducers, setAvailableProducers] = useState(new Map());
-  const [consumingProducers, setConsumingProducers] = useState(new Map());
+
+  // --- REFACTORED: Unified Producer State ---
+  // Map<socketId, { audio?: ProducerInfo, video?: ProducerInfo }>
+  // ProducerInfo = { producerId, kind, ownerSocketId }
+  const [producersBySocketId, setProducersBySocketId] = useState(new Map());
+
+  // --- REFACTORED: Unified Consumer State ---
+  // Map<socketId, { audio?: Consumer, video?: Consumer }>
+  const [consumersBySocketId, setConsumersBySocketId] = useState(new Map());
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Metronome (DataChannel) state
+  // Local Media State
+  // ────────────────────────────────────────────────────────────────────────────
+  const [localAudioStream, setLocalAudioStream] = useState(null);
+  const [myAudioProducer, setMyAudioProducer] = useState(null);
+  const [localVideoStream, setLocalVideoStream] = useState(null); // <-- NEW
+  const [myVideoProducer, setMyVideoProducer] = useState(null); // <-- NEW
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Metronome State
   // ────────────────────────────────────────────────────────────────────────────
   const [metronomeLeaderSocketId, setMetronomeLeaderSocketId] = useState(null);
   const [isLeader, setIsLeader] = useState(false);
@@ -236,36 +247,42 @@ export default function RoomPage() {
   const firstUnmountRef = useRef(false);
 
   // ────────────────────────────────────────────────────────────────────────────
-  // --- NEW: Audio Control State ---
+  // Audio & Video Control State
   // ────────────────────────────────────────────────────────────────────────────
   
   // Device Lists
   const [inputDevices, setInputDevices] = useState([]);
   const [outputDevices, setOutputDevices] = useState([]);
+  const [videoDevices, setVideoDevices] = useState([]); // <-- NEW
 
   // Selected Device IDs
   const [selectedInputId, setSelectedInputId] = useState('');
   const [selectedOutputId, setSelectedOutputId] = useState('');
+  const [selectedVideoInputId, setSelectedVideoInputId] = useState(''); // <-- NEW
 
-  // getUserMedia constraints
+  // Audio getUserMedia constraints
   const [echoCancellation, setEchoCancellation] = useState(true);
   const [noiseSuppression, setNoiseSuppression] = useState(true);
   const [autoGainControl, setAutoGainControl] = useState(true);
-  const [sampleRate, setSampleRate] = useState('48000');
-  const [latency, setLatency] = useState('0.01'); // 10ms 'interactive' hint
+  const [audioSampleRate, setAudioSampleRate] = useState('48000');
+  const [audioLatency, setAudioLatency] = useState('0.01'); 
 
-  // Mediasoup Opus codec controls
+  // Audio Opus codec controls
   const [opusStereo, setOpusStereo] = useState(true);
   const [opusDtx, setOpusDtx] = useState(false);
   const [opusFec, setOpusFec] = useState(true);
+
+  // Video getUserMedia constraints (NEW)
+  const [videoResolution, setVideoResolution] = useState('720p');
+  const [videoFramerate, setVideoFramerate] = useState('30');
   
   // ────────────────────────────────────────────────────────────────────────────
-  // --- NEW: Helper Function to Get Audio Devices ---
+  // Helper: Get Audio/Video Devices
   // ────────────────────────────────────────────────────────────────────────────
   const updateAudioDevices = async () => {
     try {
       LOG('Updating audio devices...');
-      await navigator.mediaDevices.getUserMedia({ audio: true }); // Request permission first
+      await navigator.mediaDevices.getUserMedia({ audio: true }); // Request permission
       const devices = await navigator.mediaDevices.enumerateDevices();
       
       const inputs = devices.filter(d => d.kind === 'audioinput');
@@ -274,31 +291,43 @@ export default function RoomPage() {
       setInputDevices(inputs);
       setOutputDevices(outputs);
 
-      // Set default selection
       if (!selectedInputId && inputs.length > 0) {
         setSelectedInputId(inputs[0].deviceId);
       }
       if (!selectedOutputId && outputs.length > 0) {
         setSelectedOutputId(outputs[0].deviceId);
       }
-      LOG(`Devices found: ${inputs.length} inputs, ${outputs.length} outputs`);
+      LOG(`Audio devices found: ${inputs.length} inputs, ${outputs.length} outputs`);
     } catch (err) {
-      ERR('Error enumerating devices:', err);
-      // This often happens if user denies mic permission
+      ERR('Error enumerating audio devices:', err);
+    }
+  };
+
+  // --- NEW: Helper to get video devices ---
+  const updateVideoDevices = async () => {
+    try {
+      LOG('Updating video devices...');
+      await navigator.mediaDevices.getUserMedia({ video: true }); // Request permission
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      
+      const inputs = devices.filter(d => d.kind === 'videoinput');
+      setVideoDevices(inputs);
+
+      if (!selectedVideoInputId && inputs.length > 0) {
+        setSelectedVideoInputId(inputs[0].deviceId);
+      }
+      LOG(`Video devices found: ${inputs.length} inputs`);
+    } catch (err) {
+      ERR('Error enumerating video devices:', err);
     }
   };
 
 
   // ────────────────────────────────────────────────────────────────────────────
-  // --- useEffect 1 (Boot & Lifecycle) ---
+  // useEffect 1 (Boot & Lifecycle)
   // ────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    LOG('boot useEffect start', {
-      NODE_ENV: process.env.NODE_ENV,
-      SIGNAL_URL:
-        process.env.NEXT_PUBLIC_SIGNAL_URL || 'http://localhost:4000',
-      roomId,
-    });
+    LOG('boot useEffect start', { roomId });
 
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     audioContextRef.current = ctx;
@@ -328,9 +357,7 @@ export default function RoomPage() {
         !firstUnmountRef.current
       ) {
         firstUnmountRef.current = true;
-        LOG(
-          'dev double-unmount guard: skipping disconnect on first cleanup'
-        );
+        LOG('dev double-unmount guard: skipping disconnect on first cleanup');
         window.removeEventListener('beforeunload', onBeforeUnload);
         return;
       }
@@ -342,7 +369,8 @@ export default function RoomPage() {
   }, [roomId]); 
 
   // ────────────────────────────────────────────────────────────────────────────
-  // --- useEffect 2 (Socket Listeners) ---
+  // useEffect 2 (Socket Listeners)
+  // --- MODIFIED: Handles producersBySocketId ---
   // ────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     LOG('Registering socket listeners...', { metronomeLeaderSocketId, metronomeDataProducerId: metronomeDataProducer?.id });
@@ -355,18 +383,40 @@ export default function RoomPage() {
     const off2 = socketService.onParticipantLeft(({ socketId }) => {
       LOG('[SOCKET] participantLeft', socketId);
       setParticipantIds((prev) => prev.filter((id) => id !== socketId));
+      
+      // --- NEW: Clean up state for left participant ---
+      setProducersBySocketId(prev => {
+        const next = new Map(prev);
+        next.delete(socketId);
+        return next;
+      });
+      setConsumersBySocketId(prev => {
+        const next = new Map(prev);
+        // We don't need to close consumers here,
+        // 'mediaProducerClosed' (off4) will handle that.
+        next.delete(socketId);
+        return next;
+      });
+      // --- END NEW ---
     });
 
     const off3 = socketService.onMediaProducerCreated(
       ({ producerId, kind, ownerSocketId }) => {
-        LOG('[SOCKET] mediaProducerCreated', {
-          producerId,
-          kind,
-          ownerSocketId,
-        });
-        setAvailableProducers((prev) => {
+        LOG('[SOCKET] mediaProducerCreated', { producerId, kind, ownerSocketId });
+        
+        // --- REFACTORED: Store by socketId ---
+        setProducersBySocketId((prev) => {
           const next = new Map(prev);
-          next.set(producerId, { kind, ownerSocketId });
+          const userProducers = next.get(ownerSocketId) || {};
+          
+          const newProducerInfo = { producerId, kind, ownerSocketId };
+          if (kind === 'audio') {
+            userProducers.audio = newProducerInfo;
+          } else if (kind === 'video') {
+            userProducers.video = newProducerInfo;
+          }
+          
+          next.set(ownerSocketId, userProducers);
           return next;
         });
       }
@@ -374,41 +424,59 @@ export default function RoomPage() {
 
     const off4 = socketService.onMediaProducerClosed(({ producerId }) => {
       LOG('[SOCKET] mediaProducerClosed', producerId);
-      setAvailableProducers((prev) => {
+
+      // --- REFACTORED: Find and remove the specific producer ---
+      let foundSocketId;
+      setProducersBySocketId((prev) => {
         const next = new Map(prev);
-        next.delete(producerId);
+        for (const [socketId, userProducers] of next.entries()) {
+          if (userProducers.audio?.producerId === producerId) {
+            foundSocketId = socketId;
+            userProducers.audio = undefined;
+            break;
+          }
+          if (userProducers.video?.producerId === producerId) {
+            foundSocketId = socketId;
+            userProducers.video = undefined;
+            break;
+          }
+        }
         return next;
       });
-      setConsumingProducers((prev) => {
-        const next = new Map(prev);
-        const entry = next.get(producerId);
-        if (entry?.consumer) {
+
+      if (foundSocketId) {
+        setConsumersBySocketId(prev => {
+          const next = new Map(prev);
+          const userConsumers = next.get(foundSocketId);
+          if (!userConsumers) return next;
+
           try {
-            entry.consumer.close();
-            LOG('Closed local consumer due to remote producer close', producerId);
+            if (userConsumers.audio?.producerId === producerId) {
+              userConsumers.audio.close();
+              userConsumers.audio = undefined;
+            }
+            if (userConsumers.video?.producerId === producerId) {
+              userConsumers.video.close();
+              userConsumers.video = undefined;
+            }
           } catch (e) {
             WARN('Error closing consumer on producerClose', e);
           }
-        }
-        next.delete(producerId);
-        return next;
-      });
+          next.set(foundSocketId, userConsumers);
+          return next;
+        });
+      }
     });
 
+    // ... (off5, off6, off7 for metronome are unchanged) ...
     const off5 = socketService.onDataProducerCreated(
       ({ dataProducerId, label, ownerSocketId }) => {
-        LOG('[SOCKET] dataProducerCreated', {
-          dataProducerId,
-          label,
-          ownerSocketId,
-          leader: metronomeLeaderSocketId,
-        });
+        LOG('[SOCKET] dataProducerCreated', { dataProducerId, label, ownerSocketId, leader: metronomeLeaderSocketId });
         if (label === 'metronome' && ownerSocketId === metronomeLeaderSocketId) {
           setMetronomeDataProducer({ id: dataProducerId, label, ownerSocketId });
         }
       }
     );
-
     const off6 = socketService.on('newMetronomeLeader', ({ leaderSocketId }) => {
       LOG('[SOCKET] newMetronomeLeader', leaderSocketId);
       setMetronomeLeaderSocketId(leaderSocketId);
@@ -416,7 +484,6 @@ export default function RoomPage() {
       setIsMetronomeConsuming(false);
       setMetronomeDataProducer(null);
     });
-
     const off7 = socketService.on('dataProducerClosed', ({ dataProducerId }) => {
       LOG('[SOCKET] dataProducerClosed', dataProducerId);
       if (metronomeDataProducer?.id === dataProducerId) {
@@ -427,45 +494,26 @@ export default function RoomPage() {
 
     return () => {
       LOG('Cleaning up socket listeners...');
-      off1();
-      off2();
-      off3();
-      off4();
-      off5();
-      off6();
-      off7();
+      off1(); off2(); off3(); off4(); off5(); off6(); off7();
     };
   }, [metronomeLeaderSocketId, metronomeDataProducer?.id]);
 
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Connect → join → load device → create recv transport
+  // Connect
+  // --- MODIFIED: Reads existingProducers into new state structure ---
   // ────────────────────────────────────────────────────────────────────────────
   const handleConnect = () => {
-    if (isConnected) {
-      LOG('Already connected; ignoring handleConnect');
-      return;
-    }
-
-    const SIGNAL =
-      process.env.NEXT_PUBLIC_SIGNAL_URL || 'http://localhost:4000';
+    if (isConnected) return;
+    const SIGNAL = process.env.NEXT_PUBLIC_SIGNAL_URL || 'http://localhost:4000';
     LOG('Connecting to signaling…', SIGNAL);
 
     socketService.connect(SIGNAL, async () => {
-      LOG(
-        'socketService.connect() callback fired; socketId:',
-        socketService.socket?.id
-      );
-
-      socketService.socket?.on('disconnect', (r) =>
-        LOG('[client] disconnect:', r)
-      );
-      socketService.socket?.on('connect_error', (e) =>
-        ERR('[client] connect_error:', e?.message)
-      );
-      socketService.socket?.on('reconnect', (n) =>
-        LOG('[client] reconnect attempt:', n)
-      );
+      LOG('socketService.connect() callback fired; socketId:', socketService.socket?.id);
+      
+      socketService.socket?.on('disconnect', (r) => LOG('[client] disconnect:', r));
+      socketService.socket?.on('connect_error', (e) => ERR('[client] connect_error:', e?.message));
+      socketService.socket?.on('reconnect', (n) => LOG('[client] reconnect attempt:', n));
 
       socketService.joinRoom(roomId, async (reply) => {
         LOG('joinRoom reply:', reply);
@@ -484,12 +532,6 @@ export default function RoomPage() {
 
         setParticipantIds(otherParticipantIds || []);
 
-        LOG('Joined room snapshot', {
-          otherParticipantIds,
-          leaderId,
-          existingProducersCount: existingProducers.length,
-        });
-
         try {
           await mediasoupService.loadDevice(routerRtpCapabilities);
           LOG('Mediasoup device loaded');
@@ -506,29 +548,29 @@ export default function RoomPage() {
           return;
         }
 
-        const seeded = new Map();
+        // --- REFACTORED: Seed producersBySocketId ---
+        const seededProducers = new Map();
         for (const p of existingProducers) {
-          if (p.kind === 'audio') {
-            seeded.set(p.producerId, {
-              kind: p.kind,
-              ownerSocketId: p.ownerSocketId,
-            });
+          const { ownerSocketId, kind, producerId } = p;
+          if (!ownerSocketId) continue;
+          
+          const userProducers = seededProducers.get(ownerSocketId) || {};
+          const newProducerInfo = { producerId, kind, ownerSocketId };
+
+          if (kind === 'audio') {
+            userProducers.audio = newProducerInfo;
+          } else if (kind === 'video') {
+            userProducers.video = newProducerInfo;
           }
+          seededProducers.set(ownerSocketId, userProducers);
         }
-        setAvailableProducers(seeded);
-        LOG('Seeded availableProducers:', Array.from(seeded.keys()));
+        setProducersBySocketId(seededProducers);
+        LOG('Seeded producersBySocketId:', seededProducers);
+        // --- END REFACTORED ---
 
         setMetronomeLeaderSocketId(leaderId);
-        setIsLeader(
-          !!leaderId && leaderId === socketService.socket?.id
-        );
-        LOG(
-          'Leader? ',
-          leaderId,
-          'isLeader=',
-          !!leaderId &&
-            leaderId === socketService.socket?.id
-        );
+        setIsLeader(!!leaderId && leaderId === socketService.socket?.id);
+        LOG('Leader?', leaderId, 'isLeader=', !!leaderId && leaderId === socketService.socket?.id);
 
         const leaderMetro = existingDataProducers.find(dp => 
           dp.label === 'metronome' && dp.ownerSocketId === leaderId
@@ -541,27 +583,23 @@ export default function RoomPage() {
             ownerSocketId: leaderMetro.ownerSocketId
           });
         }
-
         setIsConnected(true);
       });
     });
   };
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Producer (mic)
-  // --- MODIFIED: Uses all new audio settings ---
+  // Local Audio Handlers
+  // --- RENAMED: handleGetMic -> handleGetAudio ---
   // ────────────────────────────────────────────────────────────────────────────
-  const handleGetMic = async () => {
-    LOG('Get microphone clicked');
-
+  const handleGetAudio = async () => {
+    LOG('Get Audio clicked');
     try {
       if (audioContextRef.current?.state === 'suspended') {
         await audioContextRef.current.resume();
-        LOG('AudioContext resumed on mic grant');
+        LOG('AudioContext resumed on audio grant');
       }
 
-      // --- NEW: Populate devices on first click ---
-      // This is the first time we are allowed to ask for device lists
       if (inputDevices.length === 0) {
         await updateAudioDevices();
       }
@@ -570,106 +608,169 @@ export default function RoomPage() {
         echoCancellation: echoCancellation,
         noiseSuppression: noiseSuppression,
         autoGainControl: autoGainControl,
-        // Use selected deviceId if available
         deviceId: selectedInputId ? { exact: selectedInputId } : undefined,
-        // Add advanced constraints
-        sampleRate: { ideal: parseInt(sampleRate, 10) },
-        latency: parseFloat(latency)
+        sampleRate: { ideal: parseInt(audioSampleRate, 10) },
+        latency: parseFloat(audioLatency)
       };
       
-      LOG('Requesting microphone with constraints:', audioConstraints);
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: audioConstraints,
-      });
-
-      setLocalStream(stream);
-      LOG(
-        'Got mic stream with tracks:',
-        stream.getTracks().map((t) => ({ id: t.id, kind: t.kind }))
-      );
+      LOG('Requesting audio with constraints:', audioConstraints);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+      setLocalAudioStream(stream);
+      LOG('Got audio stream:', stream.getTracks().map(t => t.id));
     } catch (err) {
       ERR('Error getting microphone:', err);
       alert(`Error getting mic: ${err.message}. Your hardware might not support the selected settings.`);
     }
   };
 
-  const handleStartProducing = async () => {
-    if (!localStream) {
-      WARN('StartProducing without mic stream');
+  const handleStartAudio = async () => {
+    if (!localAudioStream) {
       alert('Get microphone first');
       return;
     }
-    LOG('StartProducing…');
+    LOG('StartAudio…');
     try {
       await mediasoupService.createSendTransport();
       LOG('Send transport ready');
-      const track = localStream.getAudioTracks()[0];
+      const track = localAudioStream.getAudioTracks()[0];
 
-      // Pass the Opus codec settings from our state
       const producer = await mediasoupService.produce(track, {
         opusStereo: opusStereo,
         opusDtx: opusDtx,
         opusFec: opusFec,
       });
       
-      setMyProducer(producer);
+      setMyAudioProducer(producer);
       LOG('Producing audio; producerId=', producer?.id);
     } catch (e) {
-      ERR('StartProducing failed', e);
+      ERR('StartAudio failed', e);
     }
   };
 
-  const handleStopProducing = () => {
-    if (!myProducer) return;
-    LOG('StopProducing; closing producer', myProducer.id);
-    try { myProducer.close(); } catch (e) { WARN('producer.close error', e); }
-    setMyProducer(null);
-
-    // Stop and clear the local stream
-    // This allows user to click "Get Microphone" again with new settings
-    try {
-      localStream?.getTracks().forEach(track => track.stop());
-    } catch (e) {
-      WARN('localStream.stop error', e);
+  const handleStopAudio = () => {
+    if (myAudioProducer) {
+      LOG('StopAudio; closing producer', myAudioProducer.id);
+      try { myAudioProducer.close(); } catch (e) { WARN('producer.close error', e); }
+      setMyAudioProducer(null);
     }
-    setLocalStream(null);
+    if (localAudioStream) {
+      try { localAudioStream.getTracks().forEach(track => track.stop()); } catch (e) { WARN('localAudioStream.stop error', e); }
+      setLocalAudioStream(null);
+    }
   };
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Consumers (audio)
+  // --- NEW: Local Video Handlers ---
   // ────────────────────────────────────────────────────────────────────────────
-  const handleConsume = async (producerId) => {
-    LOG('Consume clicked for', producerId);
+  const handleGetVideo = async () => {
+    LOG('Get Video clicked');
     try {
-      const consumer = await mediasoupService.consume(producerId);
-
-      if (!consumer) {
-        WARN('mediasoupService.consume returned null for', producerId);
-        return;
+      if (videoDevices.length === 0) {
+        await updateVideoDevices();
       }
-      LOG('Got consumer from mediasoupService', {
-        consumerId: consumer.id,
-        producerId: consumer.producerId,
-        kind: consumer.kind,
-        paused: consumer.paused, 
-        trackId: consumer.track?.id,
-        trackReadyState: consumer.track?.readyState,
-      });
+
+      const res = videoResolution.split('p')[0]; // "720p" -> "720"
+      const constraints = {
+        width: { ideal: res === '1080' ? 1920 : 1280 },
+        height: { ideal: parseInt(res, 10) },
+        frameRate: { ideal: parseInt(videoFramerate, 10) },
+        deviceId: selectedVideoInputId ? { exact: selectedVideoInputId } : undefined,
+      };
+
+      LOG('Requesting video with constraints:', constraints);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: constraints });
+      setLocalVideoStream(stream);
+      LOG('Got video stream:', stream.getTracks().map(t => t.id));
+    } catch (err) {
+      ERR('Error getting video:', err);
+      alert(`Error getting video: ${err.message}.`);
+    }
+  };
+
+  const handleStartVideo = async () => {
+    if (!localVideoStream) {
+      alert('Get webcam first');
+      return;
+    }
+    LOG('StartVideo…');
+    try {
+      await mediasoupService.createSendTransport();
+      LOG('Send transport ready for video');
+      const track = localVideoStream.getVideoTracks()[0];
+
+      const res = videoResolution.split('p')[0];
+      const videoConstraints = {
+        width: { ideal: res === '1080' ? 1920 : 1280 },
+        height: { ideal: parseInt(res, 10) },
+        frameRate: { ideal: parseInt(videoFramerate, 10) },
+      };
+
+      const producer = await mediasoupService.produce(track, {}, videoConstraints);
       
-      setConsumingProducers((prev) => {
+      setMyVideoProducer(producer);
+      LOG('Producing video; producerId=', producer?.id);
+    } catch (e) {
+      ERR('StartVideo failed', e);
+    }
+  };
+
+  const handleStopVideo = () => {
+    if (myVideoProducer) {
+      LOG('StopVideo; closing producer', myVideoProducer.id);
+      try { myVideoProducer.close(); } catch (e) { WARN('video producer.close error', e); }
+      setMyVideoProducer(null);
+    }
+    if (localVideoStream) {
+      try { localVideoStream.getTracks().forEach(track => track.stop()); } catch (e) { WARN('localVideoStream.stop error', e); }
+      setLocalVideoStream(null);
+    }
+  };
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // --- REFACTORED: Remote Consumer Handlers ---
+  // ────────────────────────────────────────────────────────────────────────────
+  const handleConsumeJammer = async (socketId) => {
+    const userProducers = producersBySocketId.get(socketId);
+    if (!userProducers) {
+      WARN('No producers found for socketId', socketId);
+      return;
+    }
+
+    LOG('Consuming jammer', socketId, userProducers);
+
+    let audioConsumer, videoConsumer;
+
+    try {
+      // Consume Audio
+      if (userProducers.audio) {
+        audioConsumer = await mediasoupService.consume(userProducers.audio.producerId);
+        LOG('Audio consume OK', audioConsumer.id);
+      }
+      
+      // Consume Video
+      if (userProducers.video) {
+        videoConsumer = await mediasoupService.consume(userProducers.video.producerId);
+        LOG('Video consume OK', videoConsumer.id);
+      }
+
+      // Add to state
+      setConsumersBySocketId(prev => {
         const next = new Map(prev);
-        next.set(producerId, { consumer });
+        next.set(socketId, {
+          audio: audioConsumer,
+          video: videoConsumer,
+        });
         return next;
       });
-      LOG('Now consuming', producerId, '-> consumerId:', consumer.id, 'kind:', consumer.kind);
+
     } catch (err) {
-      ERR('consume failed:', err);
+      ERR('handleConsumeJammer failed:', err);
     }
   };
 
+
   // ────────────────────────────────────────────────────────────────────────────
-  // Metronome (DataChannel)
+  // Metronome (DataChannel) - (Unchanged)
   // ────────────────────────────────────────────────────────────────────────────
   const playClick = () => {
     if (!audioContextRef.current || !clickBufferRef.current) {
@@ -690,11 +791,19 @@ export default function RoomPage() {
     LOG('[ROOM] startLeaderMetronome request; isLeader?', isLeader, 'bpm', bpm);
     if (!isLeader)
       return alert('Only the leader can start the metronome.');
+
+    // --- FIX: 1. Enable local playback ---
+    setIsMetronomeEnabled(true);
+    metronomeStateRef.current.isEnabled = true;
+    // --- END FIX ---
+
     await mediasoupService.createSendTransport();
+
     if (metronomeSenderRef.current.dp) {
       LOG('[ROOM] leader metronome already running; ignoring');
       return;
     }
+
     const dp = await mediasoupService.createDataProducer({
       label: 'metronome',
       protocol: 'json',
@@ -715,17 +824,38 @@ export default function RoomPage() {
       }
     }, periodMs);
     LOG('[ROOM] metronome interval started', { bpm, periodMs });
+
+    // --- FIX: 2. Manually subscribe to our own producer ---
+    setMetronomeDataProducer({
+      id: dp.id,
+      label: dp.label,
+      ownerSocketId: socketService.socket.id 
+    });
+    await subscribeMetronomeIfReady(); 
+    // --- END FIX ---
   };
 
   const stopLeaderMetronome = () => {
     LOG('[ROOM] stopLeaderMetronome called');
+
+    // --- FIX: 1. Stop local playback ---
+    setIsMetronomeEnabled(false);
+    metronomeStateRef.current.isEnabled = false;
+    // --- END FIX ---
+
     const { dp, interval } = metronomeSenderRef.current;
     if (interval) clearInterval(interval);
     metronomeSenderRef.current.interval = null;
+
     if (dp) {
       try { dp.close?.(); } catch (e) { WARN('[ROOM] dp.close error', e); }
     }
     metronomeSenderRef.current.dp = null;
+    
+    // --- FIX: 2. Clear producer state and subscription ---
+    setMetronomeDataProducer(null);
+    setIsMetronomeConsuming(false);
+    // --- END FIX ---
   };
 
   const subscribeMetronomeIfReady = async () => {
@@ -855,15 +985,87 @@ export default function RoomPage() {
               </Button>
             </Card>
 
-            {/* --- MODIFIED: Renamed Card --- */}
+            {/* --- NEW: Local Video Card --- */}
+            <Card title="Local Video" icon={<IconVideo />} className={!isConnected ? 'pointer-events-none' : ''}>
+              <div className="w-full aspect-video bg-neutral-800 rounded-md overflow-hidden">
+                {localVideoStream && (
+                  <video
+                    ref={el => { if (el) el.srcObject = localVideoStream; }}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
+                )}
+              </div>
+              <SettingsSelect
+                label="Input Device (Webcam)"
+                value={selectedVideoInputId}
+                onChange={(e) => setSelectedVideoInputId(e.target.value)}
+                disabled={!!localVideoStream || videoDevices.length === 0}
+              >
+                {videoDevices.length === 0 && <option>Click "Get Cam" to populate</option>}
+                {videoDevices.map(d => (
+                  <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
+                ))}
+              </SettingsSelect>
+              <SettingsSelect
+                label="Resolution"
+                value={videoResolution}
+                onChange={(e) => setVideoResolution(e.target.value)}
+                disabled={!!localVideoStream}
+              >
+                <option value="360p">640x360 (Low)</option>
+                <option value="720p">1280x720 (Default)</option>
+                <option value="1080p">1920x1080 (High)</option>
+              </SettingsSelect>
+              <SettingsSelect
+                label="Framerate"
+                value={videoFramerate}
+                onChange={(e) => setVideoFramerate(e.target.value)}
+                disabled={!!localVideoStream}
+              >
+                <option value="15">15 fps (Low)</option>
+                <option value="30">30 fps (Standard)</option>
+              </SettingsSelect>
+
+              <div className="pt-4 border-t border-neutral-700 space-y-3">
+                <Button
+                  onClick={handleGetVideo}
+                  disabled={!isConnected || !!localVideoStream}
+                  className="bg-blue-600 hover:bg-blue-500"
+                  icon={<IconVideoOff />}
+                >
+                  {localVideoStream ? 'Webcam Active' : 'Get Webcam'}
+                </Button>
+                {!myVideoProducer ? (
+                  <Button
+                    onClick={handleStartVideo}
+                    disabled={!isConnected || !localVideoStream}
+                    className="bg-green-600 hover:bg-green-500"
+                    icon={<IconPlay />}
+                  >
+                    Start Video
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleStopVideo}
+                    className="bg-red-600 hover:bg-red-500"
+                    icon={<IconStop />}
+                  >
+                    Stop Video
+                  </Button>
+                )}
+              </div>
+            </Card>
+
             <Card title="Local Audio Settings" icon={<IconMic />} className={!isConnected ? 'pointer-events-none' : ''}>
               
-              {/* --- NEW: Device Selectors --- */}
               <SettingsSelect
                 label="Input Device (Microphone)"
                 value={selectedInputId}
                 onChange={(e) => setSelectedInputId(e.target.value)}
-                disabled={!!localStream || inputDevices.length === 0}
+                disabled={!!localAudioStream || inputDevices.length === 0}
               >
                 {inputDevices.length === 0 && <option>Click "Get Mic" to populate</option>}
                 {inputDevices.map(d => (
@@ -885,23 +1087,21 @@ export default function RoomPage() {
               <p className="text-xs text-neutral-400 px-3 -mt-2">
                 Note: Metronome audio always uses the system default output.
               </p>
-              {/* --- END NEW --- */}
-
 
               <div className="pt-4 border-t border-neutral-700 space-y-3">
                 <Button
-                  onClick={handleGetMic}
-                  disabled={!isConnected || !!localStream}
+                  onClick={handleGetAudio}
+                  disabled={!isConnected || !!localAudioStream}
                   className="bg-blue-600 hover:bg-blue-500"
                   icon={<IconMicOff />}
                 >
-                  {localStream ? 'Mic Active' : 'Get Microphone'}
+                  {localAudioStream ? 'Mic Active' : 'Get Microphone'}
                 </Button>
 
-                {!myProducer ? (
+                {!myAudioProducer ? (
                   <Button
-                    onClick={handleStartProducing}
-                    disabled={!isConnected || !localStream}
+                    onClick={handleStartAudio}
+                    disabled={!isConnected || !localAudioStream}
                     className="bg-green-600 hover:bg-green-500"
                     icon={<IconPlay />}
                   >
@@ -909,7 +1109,7 @@ export default function RoomPage() {
                   </Button>
                 ) : (
                   <Button
-                    onClick={handleStopProducing}
+                    onClick={handleStopAudio}
                     className="bg-red-600 hover:bg-red-500"
                     icon={<IconStop />}
                   >
@@ -927,39 +1127,38 @@ export default function RoomPage() {
                   description="Recommended without headphones"
                   checked={echoCancellation}
                   onChange={(e) => setEchoCancellation(e.target.checked)}
-                  disabled={!!localStream}
+                  disabled={!!localAudioStream}
                 />
                 <SettingsCheckbox
                   label="Noise Suppression"
                   description="Filters out background noise"
                   checked={noiseSuppression}
                   onChange={(e) => setNoiseSuppression(e.target.checked)}
-                  disabled={!!localStream}
+                  disabled={!!localAudioStream}
                 />
                 <SettingsCheckbox
                   label="Auto Gain Control"
                   description="Adjusts mic volume automatically"
                   checked={autoGainControl}
                   onChange={(e) => setAutoGainControl(e.target.checked)}
-                  disabled={!!localStream}
+                  disabled={!!localAudioStream}
                 />
-                {!!localStream && (
+                {!!localAudioStream && (
                   <p className="text-xs text-indigo-300 px-3 pt-2">
                     Stop your mic to change these settings.
                   </p>
                 )}
               </div>
               
-              {/* --- NEW: Advanced Sample Rate / Latency --- */}
               <div className="pt-4 border-t border-neutral-700 space-y-1">
                 <h3 className="text-sm font-medium text-neutral-300 px-3 pb-2">
                   Mic Quality (Advanced)
                 </h3>
                 <SettingsSelect
                   label="Sample Rate (Request)"
-                  value={sampleRate}
-                  onChange={(e) => setSampleRate(e.target.value)}
-                  disabled={!!localStream}
+                  value={audioSampleRate}
+                  onChange={(e) => setAudioSampleRate(e.target.value)}
+                  disabled={!!localAudioStream}
                 >
                   <option value="48000">48000 Hz (Pro Audio)</option>
                   <option value="44100">44100 Hz (CD Quality)</option>
@@ -967,16 +1166,16 @@ export default function RoomPage() {
                 </SettingsSelect>
                 <SettingsSelect
                   label="Buffer Size / Latency (Hint)"
-                  value={latency}
-                  onChange={(e) => setLatency(e.target.value)}
-                  disabled={!!localStream}
+                  value={audioLatency}
+                  onChange={(e) => setAudioLatency(e.target.value)}
+                  disabled={!!localAudioStream}
                 >
                   <option value="0">0 (Browser Default)</option>
                   <option value="0.005">0.005s (Lowest Latency)</option>
                   <option value="0.01">0.01s (Interactive)</option>
                   <option value="0.02">0.02s (Stable)</option>
                 </SettingsSelect>
-                {!!localStream && (
+                {!!localAudioStream && (
                   <p className="text-xs text-indigo-300 px-3 pt-2">
                     Stop your mic to change these settings.
                   </p>
@@ -992,23 +1191,23 @@ export default function RoomPage() {
                   description="Send 2 channels (music)"
                   checked={opusStereo}
                   onChange={(e) => setOpusStereo(e.target.checked)}
-                  disabled={!!myProducer}
+                  disabled={!!myAudioProducer}
                 />
                 <SettingsCheckbox
                   label="Forward Error Correction (FEC)"
                   description="Better quality on bad networks"
                   checked={opusFec}
                   onChange={(e) => setOpusFec(e.target.checked)}
-                  disabled={!!myProducer}
+                  disabled={!!myAudioProducer}
                 />
                 <SettingsCheckbox
                   label="Discontinuous Transmission (DTX)"
                   description="Stops sending on silence (bad for music)"
                   checked={opusDtx}
                   onChange={(e) => setOpusDtx(e.target.checked)}
-                  disabled={!!myProducer}
+                  disabled={!!myAudioProducer}
                 />
-                {!!myProducer && (
+                {!!myAudioProducer && (
                   <p className="text-xs text-indigo-300 px-3 pt-2">
                     Stop producing to change codec settings.
                   </p>
@@ -1058,79 +1257,100 @@ export default function RoomPage() {
 
           {/* --------------------------------------------------- */}
           {/* Right Column: Streams (Mixer)                       */}
+          {/* --- REFACTORED: Unified Jammer List ---             */}
           {/* --------------------------------------------------- */}
           <div className="md:col-span-2 space-y-6">
 
-            <Card title="Active Channels (Mixer)" icon={<IconSpeaker />} className={!isConnected ? 'pointer-events-none' : ''}>
+            <Card title="Jammer Mix" icon={<IconSpeaker />} className={!isConnected ? 'pointer-events-none' : ''}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {Array.from(consumingProducers.entries()).map(
-                  ([producerId, { consumer }]) => (
-                    <RemoteAudio
-                      key={producerId}
-                      consumer={consumer}
-                      outputDeviceId={selectedOutputId} // <-- Pass the selected output
-                    />
-                  )
-                )}
-                {consumingProducers.size === 0 && (
-                  <p className="text-sm text-neutral-400 col-span-full">
-                    No active channels. Listen to a jammer to add them here.
-                  </p>
-                )}
-              </div>
-            </Card>
-
-            <Card title="Available Jammers" icon={<IconUser />} className={!isConnected ? 'pointer-events-none' : ''}>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {Array.from(availableProducers.entries())
-                  .filter(
-                    ([producerId, meta]) =>
-                      meta?.kind === 'audio' &&
-                      !consumingProducers.has(producerId)
-                  )
-                  .map(([producerId, meta]) => (
-                    <div
-                      key={producerId}
-                      className="bg-neutral-800 p-4 rounded-lg flex items-center justify-between gap-4 border border-neutral-700"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-neutral-300">
-                          New Jammer
-                        </p>
-                        <p className="text-xs font-mono text-neutral-400 break-all">
-                          ({meta.ownerSocketId?.slice(0, 6)}…)
-                        </p>
+                
+                {/* --- RENDER CONNECTED JAMMERS --- */}
+                {Array.from(consumersBySocketId.entries()).map(
+                  ([socketId, consumers]) => (
+                    <div key={socketId} className="bg-neutral-800 p-4 rounded-lg border border-neutral-700 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="text-green-500 flex-shrink-0"><IconUser /></div>
+                        <div>
+                          <p className="text-sm font-medium text-neutral-200">Jammer</p>
+                          <p className="text-xs font-mono text-neutral-400 break-all">{socketId.slice(0, 6)}...</p>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => handleConsume(producerId)}
-                        disabled={!localStream}
-                        className="flex-shrink-0 px-3 py-2 text-sm font-medium text-white bg-green-600 rounded-md shadow-sm hover:bg-green-500 transition-all disabled:bg-neutral-600 disabled:cursor-not-allowed"
-                      >
-                        Start Listening
-                      </button>
+                      
+                      {/* Render video if we have it */}
+                      {consumers.video && (
+                        <div className="aspect-video bg-black rounded-md overflow-hidden">
+                          <RemoteVideo consumer={consumers.video} />
+                        </div>
+                      )}
+                      
+                      {/* We render the <RemoteAudio> component regardless,
+                          it just sits there and does nothing if the consumer is null */}
+                      <RemoteAudio
+                        consumer={consumers.audio}
+                        outputDeviceId={selectedOutputId}
+                      />
                     </div>
-                  ))}
-                
-                {availableProducers.size === 0 && (
+                  )
+                )}
+
+                {/* --- RENDER AVAILABLE JAMMERS --- */}
+                {Array.from(producersBySocketId.entries())
+                  .filter(([socketId, producers]) => 
+                    !consumersBySocketId.has(socketId) && (producers.audio || producers.video)
+                  )
+                  .map(([socketId, producers]) => (
+                    <div
+                      key={socketId}
+                      className="bg-neutral-800 p-4 rounded-lg flex flex-col justify-between gap-4 border border-neutral-700"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="text-neutral-500 flex-shrink-0"><IconUser /></div>
+                        <div>
+                          <p className="text-sm font-medium text-neutral-300">
+                            Available Jammer
+                          </p>
+                          <p className="text-xs font-mono text-neutral-400 break-all">
+                            ({socketId.slice(0, 6)}…)
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {producers.audio && (
+                          <span className="text-xs bg-neutral-700 text-neutral-300 px-2 py-0.5 rounded-full">Audio</span>
+                        )}
+                        {producers.video && (
+                          <span className="text-xs bg-neutral-700 text-neutral-300 px-2 py-0.5 rounded-full">Video</span>
+                        )}
+                      </div>
+                      
+                      <Button
+                        onClick={() => handleConsumeJammer(socketId)}
+                        disabled={!localAudioStream && !localVideoStream} // Require local media to listen
+                        className="bg-green-600 hover:bg-green-500"
+                      >
+                        Connect to Jammer
+                      </Button>
+                    </div>
+                  ))
+                }
+
+                {producersBySocketId.size === 0 && (
                   <p className="text-sm text-neutral-400 col-span-full">
-                    Waiting for others to start jamming…
+                    Waiting for others to join...
                   </p>
                 )}
-                
-                {availableProducers.size > 0 && 
-                 availableProducers.size === consumingProducers.size &&
-                 Array.from(availableProducers.keys()).every(pid => consumingProducers.has(pid)) &&
-                 (
-                  <p className="text-sm text-neutral-400 col-span-full">
-                    You are listening to all available jammers.
-                  </p>
-                 )
-                }
               </div>
             </Card>
 
             <Card title="Participants" icon={<IconUser />} className={!isConnected ? 'pointer-events-none' : ''}>
               <ul className="space-y-2">
+                {/* Add self to participant list */}
+                {socketService.socket?.id && (
+                  <li className="text-sm text-indigo-300 font-mono text-xs p-3 bg-neutral-800 rounded break-all">
+                    {socketService.socket.id} (You)
+                  </li>
+                )}
                 {participantIds.map((socketId) => (
                   <li
                     key={socketId}

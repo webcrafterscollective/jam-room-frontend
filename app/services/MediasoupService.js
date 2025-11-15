@@ -232,44 +232,159 @@ class MediasoupService {
     });
   }
 
+  // // ───────────────────────────────────────────────────────────────────────────
+  // // produce()
+  // //
+  // // Creates a Producer for a local audio track.
+  // // Applies Opus codec tuning + registers clean-up handlers.
+  // // ───────────────────────────────────────────────────────────────────────────
+  // async produce(track) {
+  //   if (!this.sendTransport)
+  //     throw new Error('No send transport');
+
+  //   try {
+  //     const producer = await this.sendTransport.produce({
+  //       track,
+  //       codecOptions: {
+  //         opusStereo: true,  // Enable stereo
+  //         opusDtx: false,    // Disable discontinuous transmission
+  //         opusFec: true,     // Enable forward error correction
+  //       },
+  //     });
+
+  //     this.producers.set(producer.id, producer);
+  //     LOG('producing audio', producer.id);
+
+  //     producer.on('trackended', () =>
+  //       LOG('producer trackended', producer.id)
+  //     );
+
+  //     producer.on('transportclose', () => {
+  //       LOG('producer transportclose', producer.id);
+  //       this.producers.delete(producer.id);
+  //     });
+
+  //     return producer;
+  //   } catch (err) {
+  //     ERR('produce error', err);
+  //     throw err;
+  //   }
+  // }
+
   // ───────────────────────────────────────────────────────────────────────────
-  // produce()
+  // --- MODIFIED: produce() ---
   //
-  // Creates a Producer for a local audio track.
-  // Applies Opus codec tuning + registers clean-up handlers.
+  // Creates a Producer for a local audio OR video track.
+  // Now accepts userCodecOptions AND video constraints.
+  // Applies Simulcast for video.
   // ───────────────────────────────────────────────────────────────────────────
-  async produce(track) {
+  async produce(track, userCodecOptions = {}, videoConstraints = {}) {
     if (!this.sendTransport)
       throw new Error('No send transport');
+
+    let codecOptions = {};
+    let encodings; // This will hold our simulcast settings
+    const appData = { kind: track.kind }; // Pass track kind to appData
+
+    if (track.kind === 'audio') {
+      // --- Audio Logic ---
+      const defaultAudioCodecOptions = {
+        opusStereo: true,
+        opusDtx: false,
+        opusFec: true,
+      };
+      codecOptions = { 
+        ...defaultAudioCodecOptions, 
+        ...userCodecOptions 
+      };
+      LOG('producing AUDIO with codecOptions:', codecOptions);
+
+    } else if (track.kind === 'video') {
+      // --- Video Logic (NEW) ---
+      codecOptions = { 
+        ...userCodecOptions
+        // Note: We don't have any specific H264 options here, but you could add them.
+      };
+      
+      // Get resolution from constraints
+      const height = videoConstraints.height?.ideal || 720;
+      const framerate = videoConstraints.frameRate?.ideal || 30;
+
+      // Simulcast encodings: low, medium, high
+      // These are standard settings for 720p.
+      if (height >= 720) {
+        encodings = [
+          { 
+            scaleResolutionDownBy: 4, // 180p
+            maxBitrate: 300000, 
+            maxFramerate: 15, // Low-res layer doesn't need high FPS
+          },
+          { 
+            scaleResolutionDownBy: 2, // 360p
+            maxBitrate: 900000, 
+            maxFramerate: 15 
+          },
+          { 
+            scaleResolutionDownBy: 1, // 720p
+            maxBitrate: 2500000, 
+            maxFramerate: framerate 
+          },
+        ];
+      } else if (height >= 360) {
+        // Settings for 360p input
+         encodings = [
+          { 
+            scaleResolutionDownBy: 2, // 180p
+            maxBitrate: 300000, 
+            maxFramerate: 15, 
+          },
+          { 
+            scaleResolutionDownBy: 1, // 360p
+            maxBitrate: 900000, 
+            maxFramerate: framerate 
+          },
+        ];
+      } else {
+        // Fallback for very low resolution
+         encodings = [
+          { 
+            scaleResolutionDownBy: 1,
+            maxBitrate: 500000, 
+            maxFramerate: framerate 
+          },
+        ];
+      }
+      
+      LOG('producing VIDEO with encodings:', encodings);
+    }
 
     try {
       const producer = await this.sendTransport.produce({
         track,
-        codecOptions: {
-          opusStereo: true,  // Enable stereo
-          opusDtx: false,    // Disable discontinuous transmission
-          opusFec: true,     // Enable forward error correction
-        },
+        encodings,     // <-- This is undefined for audio, set for video
+        codecOptions,  // <-- This is set for audio, empty for video
+        appData,       // <-- Pass kind to server
       });
 
       this.producers.set(producer.id, producer);
-      LOG('producing audio', producer.id);
+      LOG(`producing ${track.kind}`, producer.id);
 
       producer.on('trackended', () =>
-        LOG('producer trackended', producer.id)
+        LOG(`producer trackended (${track.kind})`, producer.id)
       );
 
       producer.on('transportclose', () => {
-        LOG('producer transportclose', producer.id);
+        LOG(`producer transportclose (${track.kind})`, producer.id);
         this.producers.delete(producer.id);
       });
 
       return producer;
     } catch (err) {
-      ERR('produce error', err);
+      ERR(`produce error (${track.kind})`, err);
       throw err;
     }
   }
+  // --- END OF MODIFIED produce() ---
 
   // ───────────────────────────────────────────────────────────────────────────
   // consume()

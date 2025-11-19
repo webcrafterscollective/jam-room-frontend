@@ -5,71 +5,40 @@ import { useParams } from 'next/navigation';
 import { socketService } from '@/app/services/SocketService';
 import { mediasoupService } from '@/app/services/MediasoupService';
 
-const LOG = (...args) => console.log('[ROOM]', ...args);
-const WARN = (...args) => console.warn('[ROOM]', ...args);
-const ERR = (...args) => console.error('[ROOM]', ...args);
+// -----------------------------------------------------------------------------
+// ICONS
+// -----------------------------------------------------------------------------
+const IconMic = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15a3 3 0 0 1-3-3V4.5a3 3 0 0 1 6 0V12a3 3 0 0 1-3 3Z" /></svg>);
+const IconMicOff = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Zm-3.75 3a.75.75 0 0 0-1.5 0v.75a.75.75 0 0 0 1.5 0v-.75ZM12 15.75a.75.75 0 0 1-.75.75H9.75a.75.75 0 0 1 0-1.5h1.5a.75.75 0 0 1 .75.75Zm.75 2.25a.75.75 0 0 0 1.5 0v-.75a.75.75 0 0 0-1.5 0v.75ZM12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15a3 3 0 0 1-3-3V4.5a3 3 0 0 1 6 0V12a3 3 0 0 1-3 3Zm-3.938-6.528A4.5 4.5 0 0 0 6 12v1.5M18 12a4.486 4.486 0 0 0-3.062-4.028M18 13.5v-1.5a4.5 4.5 0 1 0-9 0v1.5m-3.062 4.028A4.486 4.486 0 0 1 6 12m6 9.75v-3.75M3.75 3.75l16.5 16.5" /></svg>);
+const IconPlay = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L8.029 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" /></svg>);
+const IconStop = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" /></svg>);
+const IconPlug = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.83-5.83M11.42 15.17l-4.24-4.24m5.83-5.83L15.17 11.42M12.75 5.1a.75.75 0 0 0-1.06 0l-4.24 4.24a.75.75 0 0 0 0 1.06l4.24 4.24a.75.75 0 0 0 1.06 0l4.24-4.24a.75.75 0 0 0 0-1.06l-4.24-4.24Z" /></svg>);
+const IconPlugOff = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.83-5.83M11.42 15.17l-4.24-4.24m5.83-5.83L15.17 11.42M12.75 5.1a.75.75 0 0 0-1.06 0l-4.24 4.24a.75.75 0 0 0 0 1.06l4.24 4.24a.75.75 0 0 0 0-1.06l-4.24-4.24ZM3 3l18 18" /></svg>);
+const IconUser = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>);
+const IconMetronome = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m9 9 6-6m0 0 6 6m-6-6v6m0 6v6m6-6h6m-6 0H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>);
+const IconSpeaker = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /></svg>);
+const IconVideo = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>);
+const IconVideoOff = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M12 18.75h-7.5a2.25 2.25 0 0 1-2.25-2.25v-9A2.25 2.25 0 0 1 4.5 5.25H9M18 18.75h-7.5a2.25 2.25 0 0 1-2.25-2.25v-9A2.25 2.25 0 0 1 10.5 5.25H18M3 3l18 18" /></svg>);
+const IconTerminal = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" /></svg>);
+const IconSettings = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 13.5V3.75m0 9.75a1.5 1.5 0 010 3m0-3a1.5 1.5 0 000 3m0 3.75V16.5m12-3V3.75m0 9.75a1.5 1.5 0 010 3m0-3a1.5 1.5 0 000 3m0 3.75V16.5m-6-9V3.75m0 3.75a1.5 1.5 0 010 3m0-3a1.5 1.5 0 000 3m0 9.75V10.5" /></svg>);
 
 // -----------------------------------------------------------------------------
-// UI ICONS
+// GLOBAL LOGGING (Visual Terminal)
 // -----------------------------------------------------------------------------
-const IconMic = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15a3 3 0 0 1-3-3V4.5a3 3 0 0 1 6 0V12a3 3 0 0 1-3 3Z" />
-  </svg>
-);
-const IconMicOff = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Zm-3.75 3a.75.75 0 0 0-1.5 0v.75a.75.75 0 0 0 1.5 0v-.75ZM12 15.75a.75.75 0 0 1-.75.75H9.75a.75.75 0 0 1 0-1.5h1.5a.75.75 0 0 1 .75.75Zm.75 2.25a.75.75 0 0 0 1.5 0v-.75a.75.75 0 0 0-1.5 0v.75ZM12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15a3 3 0 0 1-3-3V4.5a3 3 0 0 1 6 0V12a3 3 0 0 1-3 3Zm-3.938-6.528A4.5 4.5 0 0 0 6 12v1.5M18 12a4.486 4.486 0 0 0-3.062-4.028M18 13.5v-1.5a4.5 4.5 0 1 0-9 0v1.5m-3.062 4.028A4.486 4.486 0 0 1 6 12m6 9.75v-3.75M3.75 3.75l16.5 16.5" />
-  </svg>
-);
-const IconPlay = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L8.029 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" />
-  </svg>
-);
-const IconStop = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
-  </svg>
-);
-const IconPlug = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.83-5.83M11.42 15.17l-4.24-4.24m5.83-5.83L15.17 11.42M12.75 5.1a.75.75 0 0 0-1.06 0l-4.24 4.24a.75.75 0 0 0 0 1.06l4.24 4.24a.75.75 0 0 0 1.06 0l4.24-4.24a.75.75 0 0 0 0-1.06l-4.24-4.24Z" />
-  </svg>
-);
-const IconPlugOff = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.83-5.83M11.42 15.17l-4.24-4.24m5.83-5.83L15.17 11.42M12.75 5.1a.75.75 0 0 0-1.06 0l-4.24 4.24a.75.75 0 0 0 0 1.06l4.24 4.24a.75.75 0 0 0 1.06 0l4.24-4.24a.75.75 0 0 0 0-1.06l-4.24-4.24ZM3 3l18 18" />
-  </svg>
-);
-const IconUser = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-  </svg>
-);
-const IconMetronome = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="m9 9 6-6m0 0 6 6m-6-6v6m0 6v6m6-6h6m-6 0H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-  </svg>
-);
-const IconSpeaker = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
-  </svg>
-);
-const IconVideo = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
-  </svg>
-);
-const IconVideoOff = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M12 18.75h-7.5a2.25 2.25 0 0 1-2.25-2.25v-9A2.25 2.25 0 0 1 4.5 5.25H9M18 18.75h-7.5a2.25 2.25 0 0 1-2.25-2.25v-9A2.25 2.25 0 0 1 10.5 5.25H18M3 3l18 18" />
-  </svg>
-);
+let addLogEntry = () => {};
+
+function internalLog(level, ...args) {
+  const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+  console.log(`[${level}]`, ...args);
+  addLogEntry({ level, msg, ts: new Date().toISOString().split('T')[1].slice(0, -1) });
+}
+
+const LOG = (...args) => internalLog('INFO', ...args);
+const WARN = (...args) => internalLog('WARN', ...args);
+const ERR = (...args) => internalLog('ERROR', ...args);
 
 // -----------------------------------------------------------------------------
-// RemoteAudio Component
+// UI COMPONENTS
 // -----------------------------------------------------------------------------
 function RemoteAudio({ consumer, outputDeviceId }) {
   const audioRef = useRef(null);
@@ -77,1297 +46,580 @@ function RemoteAudio({ consumer, outputDeviceId }) {
   useEffect(() => {
     const el = audioRef.current;
     const track = consumer?.track;
-    const consumerId = consumer?.id; 
-
     if (!el || !track) return;
-
-    LOG(`[RemoteAudio] effect running for ${consumerId}`, {
-      trackId: track.id,
-      trackReadyState: track.readyState,
-      outputDeviceId,
-    });
-
-    const onPlaying = () => LOG(`[RemoteAudio EVENT (${consumerId})] ✅ onPlaying`);
-    const onError = () => ERR(`[RemoteAudio EVENT (${consumerId})] 🛑 onError`, { error: el.error });
-    el.addEventListener('playing', onPlaying);
-    el.addEventListener('error', onError);
-
-    const stream = new MediaStream();
-    stream.addTrack(track);
-    el.srcObject = stream;
-
+    el.srcObject = new MediaStream([track]);
     if (outputDeviceId && typeof el.setSinkId === 'function') {
-      el.setSinkId(outputDeviceId)
-        .catch(err => ERR(`[RemoteAudio] Failed to set output device:`, err));
+      el.setSinkId(outputDeviceId).catch(e => ERR('setSinkId failed', e));
     }
+  }, [consumer, outputDeviceId]);
 
-    return () => {
-      LOG(`[RemoteAudio] cleanup running for ${consumerId}`);
-      if (el) {
-        el.removeEventListener('playing', onPlaying);
-        el.removeEventListener('error', onError);
-        el.srcObject = null;
-      }
-    };
-  }, [consumer, consumer?.track, outputDeviceId]);
-
-  return (
-    // This element is hidden. The <RemoteJammer> component provides the UI.
-    <audio ref={audioRef} autoPlay playsInline muted={false} />
-  );
+  return <audio ref={audioRef} autoPlay playsInline />;
 }
 
-// -----------------------------------------------------------------------------
-// --- NEW: RemoteVideo Component ---
-// -----------------------------------------------------------------------------
 function RemoteVideo({ consumer }) {
   const videoRef = useRef(null);
-
   useEffect(() => {
     const el = videoRef.current;
     const track = consumer?.track;
-    const consumerId = consumer?.id;
+    if (el && track) el.srcObject = new MediaStream([track]);
+  }, [consumer]);
+  return <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />;
+}
 
-    if (!el || !track) return;
+const SettingsCheckbox = ({ label, description, checked, onChange, disabled }) => (
+  <label className={`flex items-center gap-3 p-3 rounded-lg transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-neutral-800 cursor-pointer'}`}>
+    <input type="checkbox" className="w-5 h-5 rounded-md bg-neutral-700 border-neutral-600 text-indigo-500 focus:ring-indigo-500 focus:ring-2" checked={checked} onChange={onChange} disabled={disabled} />
+    <div><p className="text-sm font-medium text-neutral-200">{label}</p><p className="text-xs text-neutral-400">{description}</p></div>
+  </label>
+);
 
-    LOG(`[RemoteVideo] effect running for ${consumerId}`, {
-      trackId: track.id,
-      trackReadyState: track.readyState,
-    });
+const SettingsSelect = ({ label, value, onChange, disabled, children }) => (
+  <div className="p-3">
+    <label className="block text-sm font-medium text-neutral-200 mb-1">{label}</label>
+    <select value={value} onChange={onChange} disabled={disabled} className="w-full bg-neutral-700 border border-neutral-600 text-neutral-200 rounded-md shadow-sm p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500">{children}</select>
+  </div>
+);
 
-    const onPlaying = () => LOG(`[RemoteVideo EVENT (${consumerId})] ✅ onPlaying`);
-    const onError = () => ERR(`[RemoteVideo EVENT (${consumerId})] 🛑 onError`, { error: el.error });
-    el.addEventListener('playing', onPlaying);
-    el.addEventListener('error', onError);
+const Card = ({ title, icon, children, className = '' }) => (
+  <div className={`bg-neutral-900 border border-neutral-800 p-5 rounded-lg shadow-lg ${className}`}>
+    <h2 className="text-xl font-semibold mb-4 border-b border-neutral-700 pb-3 flex items-center gap-2 text-indigo-400">{icon}{title}</h2>
+    <div className="space-y-3">{children}</div>
+  </div>
+);
 
-    const stream = new MediaStream();
-    stream.addTrack(track);
-    el.srcObject = stream;
+const Button = ({ onClick, disabled, children, className = '', icon }) => (
+  <button onClick={onClick} disabled={disabled} className={`w-full px-4 py-2.5 font-medium text-white rounded-md shadow-sm transition-all flex items-center justify-center gap-2 ${className} ${disabled ? 'bg-neutral-600 cursor-not-allowed' : 'hover:brightness-110'}`}>
+    {icon}<span>{children}</span>
+  </button>
+);
 
-    return () => {
-      LOG(`[RemoteVideo] cleanup running for ${consumerId}`);
-      if (el) {
-        el.removeEventListener('playing', onPlaying);
-        el.removeEventListener('error', onError);
-        el.srcObject = null;
-      }
-    };
-  }, [consumer, consumer?.track]);
-
+function LogTerminal({ logs }) {
+  const bottomRef = useRef(null);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs]);
   return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      muted // Remote video should be muted; audio comes from <RemoteAudio>
-      className="w-full h-full object-cover"
-    />
+    <div className="bg-black border border-neutral-800 rounded-lg font-mono text-xs h-64 flex flex-col shadow-2xl">
+      <div className="bg-neutral-800 px-4 py-2 flex items-center gap-2 border-b border-neutral-700">
+        <IconTerminal /> <span className="font-bold text-neutral-300">System Logs & Metrics</span>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-1">
+        {logs.length === 0 && <span className="text-neutral-600 italic">Waiting for events...</span>}
+        {logs.map((l, i) => (
+          <div key={i} className="break-all">
+            <span className="text-neutral-500">[{l.ts}]</span>{' '}
+            <span className={l.level === 'ERROR' ? 'text-red-400 font-bold' : l.level === 'WARN' ? 'text-yellow-400' : 'text-green-400'}>{l.level}:</span>{' '}
+            <span className="text-neutral-300">{l.msg}</span>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+    </div>
   );
 }
 
 // -----------------------------------------------------------------------------
-// Checkbox Component
-// -----------------------------------------------------------------------------
-const SettingsCheckbox = ({ label, description, checked, onChange, disabled }) => (
-  <label className={`flex items-center gap-3 p-3 rounded-lg transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-neutral-800 cursor-pointer'}`}>
-    <input
-      type="checkbox"
-      className="w-5 h-5 rounded-md bg-neutral-700 border-neutral-600 text-indigo-500 focus:ring-indigo-500 focus:ring-2"
-      checked={checked}
-      onChange={onChange}
-      disabled={disabled}
-    />
-    <div>
-      <p className="text-sm font-medium text-neutral-200">{label}</p>
-      <p className="text-xs text-neutral-400">{description}</p>
-    </div>
-  </label>
-);
-
-// -----------------------------------------------------------------------------
-// Select Component
-// -----------------------------------------------------------------------------
-const SettingsSelect = ({ label, value, onChange, disabled, children }) => (
-  <div className="p-3">
-    <label className="block text-sm font-medium text-neutral-200 mb-1">{label}</label>
-    <select
-      value={value}
-      onChange={onChange}
-      disabled={disabled}
-      className="w-full bg-neutral-700 border border-neutral-600 text-neutral-200 rounded-md shadow-sm p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
-    >
-      {children}
-    </select>
-  </div>
-);
-
-// -----------------------------------------------------------------------------
-// RoomPage Component (Main)
+// PAGE COMPONENT
 // -----------------------------------------------------------------------------
 
 export default function RoomPage() {
   const params = useParams();
   const roomId = params.roomid || params.roomId;
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Core State
-  // ────────────────────────────────────────────────────────────────────────────
+  // State
   const [isConnected, setIsConnected] = useState(false);
   const [participantIds, setParticipantIds] = useState([]);
-
-  // --- REFACTORED: Unified Producer State ---
-  // Map<socketId, { audio?: ProducerInfo, video?: ProducerInfo }>
-  // ProducerInfo = { producerId, kind, ownerSocketId }
+  const [logs, setLogs] = useState([]);
+  
+  // State: Media
   const [producersBySocketId, setProducersBySocketId] = useState(new Map());
-
-  // --- REFACTORED: Unified Consumer State ---
-  // Map<socketId, { audio?: Consumer, video?: Consumer }>
   const [consumersBySocketId, setConsumersBySocketId] = useState(new Map());
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // Local Media State
-  // ────────────────────────────────────────────────────────────────────────────
   const [localAudioStream, setLocalAudioStream] = useState(null);
   const [myAudioProducer, setMyAudioProducer] = useState(null);
-  const [localVideoStream, setLocalVideoStream] = useState(null); // <-- NEW
-  const [myVideoProducer, setMyVideoProducer] = useState(null); // <-- NEW
+  const [localVideoStream, setLocalVideoStream] = useState(null);
+  const [myVideoProducer, setMyVideoProducer] = useState(null);
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Metronome State
-  // ────────────────────────────────────────────────────────────────────────────
+  // State: Metronome
   const [metronomeLeaderSocketId, setMetronomeLeaderSocketId] = useState(null);
   const [isLeader, setIsLeader] = useState(false);
   const [metronomeDataProducer, setMetronomeDataProducer] = useState(null);
   const [isMetronomeConsuming, setIsMetronomeConsuming] = useState(false);
   const [isMetronomeEnabled, setIsMetronomeEnabled] = useState(false);
+
+  // State: Settings
+  const [inputDevices, setInputDevices] = useState([]);
+  const [outputDevices, setOutputDevices] = useState([]);
+  const [selectedInputId, setSelectedInputId] = useState('');
+  const [selectedOutputId, setSelectedOutputId] = useState('');
+  const [echoCancellation, setEchoCancellation] = useState(false);
+  const [noiseSuppression, setNoiseSuppression] = useState(false);
+  const [autoGainControl, setAutoGainControl] = useState(false);
+  const [audioSampleRate, setAudioSampleRate] = useState('48000');
+  const [audioLatency, setAudioLatency] = useState('0');
+  const [opusStereo, setOpusStereo] = useState(true);
+  const [opusDtx, setOpusDtx] = useState(false);
+  const [opusFec, setOpusFec] = useState(false);
+  
+  const [videoDevices, setVideoDevices] = useState([]);
+  const [selectedVideoInputId, setSelectedVideoInputId] = useState('');
+  const [videoResolution, setVideoResolution] = useState('360p');
+  const [videoFramerate, setVideoFramerate] = useState('15');
+  const [receiverPlayoutDelay, setReceiverPlayoutDelay] = useState(0);
+
+  // Refs
   const audioContextRef = useRef(null);
   const clickBufferRef = useRef(null);
   const metronomeStateRef = useRef({ isEnabled: false });
   const metronomeSenderRef = useRef({ dp: null, interval: null });
   const firstUnmountRef = useRef(false);
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Audio & Video Control State
-  // ────────────────────────────────────────────────────────────────────────────
-  
-  // Device Lists
-  const [inputDevices, setInputDevices] = useState([]);
-  const [outputDevices, setOutputDevices] = useState([]);
-  const [videoDevices, setVideoDevices] = useState([]); // <-- NEW
-
-  // Selected Device IDs
-  const [selectedInputId, setSelectedInputId] = useState('');
-  const [selectedOutputId, setSelectedOutputId] = useState('');
-  const [selectedVideoInputId, setSelectedVideoInputId] = useState(''); // <-- NEW
-
-  // Audio getUserMedia constraints
-  const [echoCancellation, setEchoCancellation] = useState(true);
-  const [noiseSuppression, setNoiseSuppression] = useState(true);
-  const [autoGainControl, setAutoGainControl] = useState(true);
-  const [audioSampleRate, setAudioSampleRate] = useState('48000');
-  const [audioLatency, setAudioLatency] = useState('0.01'); 
-
-  // Audio Opus codec controls
-  const [opusStereo, setOpusStereo] = useState(true);
-  const [opusDtx, setOpusDtx] = useState(false);
-  const [opusFec, setOpusFec] = useState(true);
-
-  // Video getUserMedia constraints (NEW)
-  const [videoResolution, setVideoResolution] = useState('720p');
-  const [videoFramerate, setVideoFramerate] = useState('30');
-  
-  // ────────────────────────────────────────────────────────────────────────────
-  // Helper: Get Audio/Video Devices
-  // ────────────────────────────────────────────────────────────────────────────
-  const updateAudioDevices = async () => {
-    try {
-      LOG('Updating audio devices...');
-      await navigator.mediaDevices.getUserMedia({ audio: true }); // Request permission
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      
-      const inputs = devices.filter(d => d.kind === 'audioinput');
-      const outputs = devices.filter(d => d.kind === 'audiooutput');
-
-      setInputDevices(inputs);
-      setOutputDevices(outputs);
-
-      if (!selectedInputId && inputs.length > 0) {
-        setSelectedInputId(inputs[0].deviceId);
-      }
-      if (!selectedOutputId && outputs.length > 0) {
-        setSelectedOutputId(outputs[0].deviceId);
-      }
-      LOG(`Audio devices found: ${inputs.length} inputs, ${outputs.length} outputs`);
-    } catch (err) {
-      ERR('Error enumerating audio devices:', err);
-    }
-  };
-
-  // --- NEW: Helper to get video devices ---
-  const updateVideoDevices = async () => {
-    try {
-      LOG('Updating video devices...');
-      await navigator.mediaDevices.getUserMedia({ video: true }); // Request permission
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      
-      const inputs = devices.filter(d => d.kind === 'videoinput');
-      setVideoDevices(inputs);
-
-      if (!selectedVideoInputId && inputs.length > 0) {
-        setSelectedVideoInputId(inputs[0].deviceId);
-      }
-      LOG(`Video devices found: ${inputs.length} inputs`);
-    } catch (err) {
-      ERR('Error enumerating video devices:', err);
-    }
-  };
-
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // useEffect 1 (Boot & Lifecycle)
-  // ────────────────────────────────────────────────────────────────────────────
+  // Bind global log
   useEffect(() => {
-    LOG('boot useEffect start', { roomId });
+    addLogEntry = (log) => setLogs(prev => [...prev.slice(-99), log]);
+  }, []);
 
+  // Mount Logic
+  useEffect(() => {
+    LOG('Initializing Room:', roomId);
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     audioContextRef.current = ctx;
-    LOG('AudioContext state', ctx.state);
 
     (async () => {
       try {
         const res = await fetch('/click.mp3');
         const buf = await res.arrayBuffer();
         clickBufferRef.current = await ctx.decodeAudioData(buf);
-        LOG('Metronome click loaded OK');
-      } catch (e) {
-        ERR('Failed to load /click.mp3', e);
-      }
+        LOG('Click sample loaded.');
+      } catch (e) { ERR('Failed to load /click.mp3', e); }
     })();
 
-    const onBeforeUnload = () => {
-      LOG('beforeunload → disconnect');
-      socketService.disconnect();
-    };
+    const onBeforeUnload = () => socketService.disconnect();
     window.addEventListener('beforeunload', onBeforeUnload);
-
     return () => {
-      LOG('boot useEffect cleanup start');
-      if (
-        process.env.NODE_ENV !== 'production' &&
-        !firstUnmountRef.current
-      ) {
+      if (process.env.NODE_ENV !== 'production' && !firstUnmountRef.current) {
         firstUnmountRef.current = true;
-        LOG('dev double-unmount guard: skipping disconnect on first cleanup');
         window.removeEventListener('beforeunload', onBeforeUnload);
         return;
       }
       window.removeEventListener('beforeunload', onBeforeUnload);
-      LOG('cleanup → disconnect now');
-      socketService.disconnect(); 
+      socketService.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId]); 
+  }, [roomId]);
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // useEffect 2 (Socket Listeners)
-  // --- MODIFIED: Handles producersBySocketId ---
-  // ────────────────────────────────────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // STATS & LATENCY
+  // ---------------------------------------------------------------------------
+  const checkLatencyStats = async () => {
+    LOG('--- CHECKING LATENCY ---');
+    if (consumersBySocketId.size === 0) {
+      LOG('No active audio streams to measure.');
+      return;
+    }
+
+    for (const [socketId, consumers] of consumersBySocketId.entries()) {
+      if (consumers.audio) {
+        try {
+          const stats = await mediasoupService.getConsumerStats(consumers.audio.id);
+          let reportFound = false;
+          stats.forEach(report => {
+            if (report.type === 'inbound-rtp') {
+              reportFound = true;
+              // NOTE: jitterBufferDelay is in seconds, total accumulated. 
+              // Modern browsers may expose 'jitterBufferDelay' as total seconds.
+              // To get average, we divide by emitted count, or just report the packet loss and RTT if available.
+              
+              const lost = report.packetsLost || 0;
+              const frames = report.framesDecoded || 0;
+              
+              // Round Trip Time is usually on candidate-pair or remote-inbound-rtp, but sometimes exposed here.
+              // We will look for associated remote-inbound-rtp or just log what we have.
+              LOG(`[AUDIO FROM ${socketId.slice(0,5)}] PktsLost: ${lost} | Frames: ${frames} | JitterBuffer: ${(report.jitterBufferDelay || 0).toFixed(3)}s`);
+            }
+            if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+              LOG(`[NET] RTT: ${(report.currentRoundTripTime * 1000).toFixed(1)}ms`);
+            }
+          });
+          if (!reportFound) LOG(`[${socketId}] No inbound-rtp stats found.`);
+        } catch (e) { ERR('Stats error:', e); }
+      }
+    }
+    LOG('------------------------');
+  };
+
+  // ---------------------------------------------------------------------------
+  // METRONOME
+  // ---------------------------------------------------------------------------
+  const playClick = () => {
+    if (audioContextRef.current && clickBufferRef.current) {
+      if (audioContextRef.current.state === 'suspended') audioContextRef.current.resume().catch(() => {});
+      const src = audioContextRef.current.createBufferSource();
+      src.buffer = clickBufferRef.current;
+      src.connect(audioContextRef.current.destination);
+      src.start(0);
+    }
+  };
+
+  // Leader Logic
+  const startLeaderMetronome = async (bpm) => {
+    if (!isLeader) return;
+    
+    // 1. Enable local playback
+    setIsMetronomeEnabled(true);
+    metronomeStateRef.current.isEnabled = true;
+    if (audioContextRef.current?.state === 'suspended') await audioContextRef.current.resume();
+
+    // 2. Create Producer
+    const dp = await mediasoupService.createDataProducer({ label: 'metronome' });
+    metronomeSenderRef.current.dp = dp;
+    setMetronomeDataProducer({ id: dp.id, label: 'metronome', ownerSocketId: socketService.socket.id });
+
+    // 3. Start interval: Play LOCAL, Send REMOTE
+    const intervalMs = 60000 / bpm;
+    LOG(`Starting Leader Metronome @ ${bpm} BPM (${intervalMs.toFixed(0)}ms)`);
+    
+    metronomeSenderRef.current.interval = setInterval(() => {
+      if (metronomeStateRef.current.isEnabled) {
+        // Play Locally
+        playClick();
+        // Send Remote
+        if (dp.readyState === 'open') {
+          dp.send(JSON.stringify({ type: 'tick', ts: Date.now() }));
+        }
+      }
+    }, intervalMs);
+  };
+
+  const stopLeaderMetronome = () => {
+    LOG('Stopping Leader Metronome');
+    setIsMetronomeEnabled(false);
+    metronomeStateRef.current.isEnabled = false;
+    clearInterval(metronomeSenderRef.current.interval);
+    metronomeSenderRef.current.dp?.close();
+    setMetronomeDataProducer(null);
+    setIsMetronomeConsuming(false);
+  };
+
+  // Follower Logic
+  const subscribeMetronomeIfReady = async () => {
+    if (!metronomeDataProducer?.id || isMetronomeConsuming || isLeader) return;
+    
+    LOG('Subscribing to metronome...');
+    await mediasoupService.consumeData(metronomeDataProducer.id, (msg) => {
+       if (msg?.type === 'tick' && metronomeStateRef.current.isEnabled) {
+         playClick();
+       }
+    });
+    setIsMetronomeConsuming(true);
+  };
+
+  // Toggle (Mute/Unmute)
+  const handleToggleMetronome = async () => {
+    const next = !isMetronomeEnabled;
+    setIsMetronomeEnabled(next);
+    metronomeStateRef.current.isEnabled = next;
+    if (next && audioContextRef.current?.state === 'suspended') await audioContextRef.current.resume();
+    
+    // Only followers need to subscribe. Leaders are already running the interval.
+    if (next && !isLeader) await subscribeMetronomeIfReady();
+  };
+
+  // Effects for Metronome
   useEffect(() => {
-    LOG('Registering socket listeners...', { metronomeLeaderSocketId, metronomeDataProducerId: metronomeDataProducer?.id });
+    if (isMetronomeEnabled && !isLeader) subscribeMetronomeIfReady();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMetronomeEnabled, metronomeDataProducer, isLeader]);
 
+  // ---------------------------------------------------------------------------
+  // SOCKET EVENTS
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
     const off1 = socketService.onParticipantJoined(({ socketId }) => {
-      LOG('[SOCKET] participantJoined', socketId);
-      setParticipantIds((prev) => [...prev, socketId]);
+      LOG('Participant joined:', socketId);
+      setParticipantIds(prev => [...prev, socketId]);
     });
-
     const off2 = socketService.onParticipantLeft(({ socketId }) => {
-      LOG('[SOCKET] participantLeft', socketId);
-      setParticipantIds((prev) => prev.filter((id) => id !== socketId));
-      
-      // --- NEW: Clean up state for left participant ---
+      LOG('Participant left:', socketId);
+      setParticipantIds(prev => prev.filter(id => id !== socketId));
+      setProducersBySocketId(prev => { const n = new Map(prev); n.delete(socketId); return n; });
+      setConsumersBySocketId(prev => { const n = new Map(prev); n.delete(socketId); return n; });
+    });
+    const off3 = socketService.onMediaProducerCreated(({ producerId, kind, ownerSocketId }) => {
+      LOG('Producer available:', kind, 'from', ownerSocketId);
       setProducersBySocketId(prev => {
-        const next = new Map(prev);
-        next.delete(socketId);
-        return next;
+        const n = new Map(prev);
+        const u = n.get(ownerSocketId) || {};
+        if (kind === 'audio') u.audio = { producerId, kind, ownerSocketId };
+        if (kind === 'video') u.video = { producerId, kind, ownerSocketId };
+        n.set(ownerSocketId, u);
+        return n;
       });
-      setConsumersBySocketId(prev => {
-        const next = new Map(prev);
-        // We don't need to close consumers here,
-        // 'mediaProducerClosed' (off4) will handle that.
-        next.delete(socketId);
-        return next;
-      });
-      // --- END NEW ---
     });
-
-    const off3 = socketService.onMediaProducerCreated(
-      ({ producerId, kind, ownerSocketId }) => {
-        LOG('[SOCKET] mediaProducerCreated', { producerId, kind, ownerSocketId });
-        
-        // --- REFACTORED: Store by socketId ---
-        setProducersBySocketId((prev) => {
-          const next = new Map(prev);
-          const userProducers = next.get(ownerSocketId) || {};
-          
-          const newProducerInfo = { producerId, kind, ownerSocketId };
-          if (kind === 'audio') {
-            userProducers.audio = newProducerInfo;
-          } else if (kind === 'video') {
-            userProducers.video = newProducerInfo;
-          }
-          
-          next.set(ownerSocketId, userProducers);
-          return next;
-        });
-      }
-    );
-
     const off4 = socketService.onMediaProducerClosed(({ producerId }) => {
-      LOG('[SOCKET] mediaProducerClosed', producerId);
-
-      // --- REFACTORED: Find and remove the specific producer ---
-      let foundSocketId;
-      setProducersBySocketId((prev) => {
-        const next = new Map(prev);
-        for (const [socketId, userProducers] of next.entries()) {
-          if (userProducers.audio?.producerId === producerId) {
-            foundSocketId = socketId;
-            userProducers.audio = undefined;
-            break;
-          }
-          if (userProducers.video?.producerId === producerId) {
-            foundSocketId = socketId;
-            userProducers.video = undefined;
-            break;
-          }
+      setProducersBySocketId(prev => {
+        const n = new Map(prev);
+        for (const [sid, u] of n.entries()) {
+          if (u.audio?.producerId === producerId) u.audio = undefined;
+          if (u.video?.producerId === producerId) u.video = undefined;
         }
-        return next;
+        return n;
       });
-
-      if (foundSocketId) {
-        setConsumersBySocketId(prev => {
-          const next = new Map(prev);
-          const userConsumers = next.get(foundSocketId);
-          if (!userConsumers) return next;
-
-          try {
-            if (userConsumers.audio?.producerId === producerId) {
-              userConsumers.audio.close();
-              userConsumers.audio = undefined;
-            }
-            if (userConsumers.video?.producerId === producerId) {
-              userConsumers.video.close();
-              userConsumers.video = undefined;
-            }
-          } catch (e) {
-            WARN('Error closing consumer on producerClose', e);
-          }
-          next.set(foundSocketId, userConsumers);
-          return next;
-        });
+    });
+    const off5 = socketService.onDataProducerCreated(({ dataProducerId, label, ownerSocketId }) => {
+      if (label === 'metronome' && ownerSocketId === metronomeLeaderSocketId) {
+        setMetronomeDataProducer({ id: dataProducerId, label, ownerSocketId });
       }
     });
-
-    // ... (off5, off6, off7 for metronome are unchanged) ...
-    const off5 = socketService.onDataProducerCreated(
-      ({ dataProducerId, label, ownerSocketId }) => {
-        LOG('[SOCKET] dataProducerCreated', { dataProducerId, label, ownerSocketId, leader: metronomeLeaderSocketId });
-        if (label === 'metronome' && ownerSocketId === metronomeLeaderSocketId) {
-          setMetronomeDataProducer({ id: dataProducerId, label, ownerSocketId });
-        }
-      }
-    );
     const off6 = socketService.on('newMetronomeLeader', ({ leaderSocketId }) => {
-      LOG('[SOCKET] newMetronomeLeader', leaderSocketId);
+      LOG('New Metronome Leader:', leaderSocketId);
       setMetronomeLeaderSocketId(leaderSocketId);
-      setIsLeader(!!leaderSocketId && leaderSocketId === socketService.socket?.id);
+      const amLeader = !!leaderSocketId && leaderSocketId === socketService.socket?.id;
+      setIsLeader(amLeader);
       setIsMetronomeConsuming(false);
-      setMetronomeDataProducer(null);
+      if (!amLeader) setMetronomeDataProducer(null);
     });
     const off7 = socketService.on('dataProducerClosed', ({ dataProducerId }) => {
-      LOG('[SOCKET] dataProducerClosed', dataProducerId);
       if (metronomeDataProducer?.id === dataProducerId) {
         setMetronomeDataProducer(null);
         setIsMetronomeConsuming(false);
       }
     });
-
-    return () => {
-      LOG('Cleaning up socket listeners...');
-      off1(); off2(); off3(); off4(); off5(); off6(); off7();
-    };
+    return () => { off1(); off2(); off3(); off4(); off5(); off6(); off7(); };
   }, [metronomeLeaderSocketId, metronomeDataProducer?.id]);
 
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // Connect
-  // --- MODIFIED: Reads existingProducers into new state structure ---
-  // ────────────────────────────────────────────────────────────────────────────
-  const handleConnect = () => {
-    if (isConnected) return;
-    const SIGNAL = process.env.NEXT_PUBLIC_SIGNAL_URL || 'http://localhost:4000';
-    LOG('Connecting to signaling…', SIGNAL);
-
-    socketService.connect(SIGNAL, async () => {
-      LOG('socketService.connect() callback fired; socketId:', socketService.socket?.id);
-      
-      socketService.socket?.on('disconnect', (r) => LOG('[client] disconnect:', r));
-      socketService.socket?.on('connect_error', (e) => ERR('[client] connect_error:', e?.message));
-      socketService.socket?.on('reconnect', (n) => LOG('[client] reconnect attempt:', n));
-
-      socketService.joinRoom(roomId, async (reply) => {
-        LOG('joinRoom reply:', reply);
-        if (reply?.error) {
-          ERR('joinRoom error:', reply.error);
-          return;
-        }
-
-        const {
-          routerRtpCapabilities,
-          existingProducers = [],
-          existingDataProducers = [], 
-          otherParticipantIds = [],
-          metronomeLeaderSocketId: leaderId = null,
-        } = reply;
-
-        setParticipantIds(otherParticipantIds || []);
-
-        try {
-          await mediasoupService.loadDevice(routerRtpCapabilities);
-          LOG('Mediasoup device loaded');
-        } catch (e) {
-          ERR('Device load failed', e);
-          return;
-        }
-
-        try {
-          await mediasoupService.createRecvTransport();
-          LOG('Receive transport created');
-        } catch (e) {
-          ERR('Recv transport create failed', e);
-          return;
-        }
-
-        // --- REFACTORED: Seed producersBySocketId ---
-        const seededProducers = new Map();
-        for (const p of existingProducers) {
-          const { ownerSocketId, kind, producerId } = p;
-          if (!ownerSocketId) continue;
-          
-          const userProducers = seededProducers.get(ownerSocketId) || {};
-          const newProducerInfo = { producerId, kind, ownerSocketId };
-
-          if (kind === 'audio') {
-            userProducers.audio = newProducerInfo;
-          } else if (kind === 'video') {
-            userProducers.video = newProducerInfo;
-          }
-          seededProducers.set(ownerSocketId, userProducers);
-        }
-        setProducersBySocketId(seededProducers);
-        LOG('Seeded producersBySocketId:', seededProducers);
-        // --- END REFACTORED ---
-
-        setMetronomeLeaderSocketId(leaderId);
-        setIsLeader(!!leaderId && leaderId === socketService.socket?.id);
-        LOG('Leader?', leaderId, 'isLeader=', !!leaderId && leaderId === socketService.socket?.id);
-
-        const leaderMetro = existingDataProducers.find(dp => 
-          dp.label === 'metronome' && dp.ownerSocketId === leaderId
-        );
-        if (leaderMetro) {
-          LOG('Seeding existing metronome producer', leaderMetro);
-          setMetronomeDataProducer({
-            id: leaderMetro.dataProducerId,
-            label: leaderMetro.label,
-            ownerSocketId: leaderMetro.ownerSocketId
-          });
-        }
-        setIsConnected(true);
-      });
-    });
-  };
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // Local Audio Handlers
-  // --- RENAMED: handleGetMic -> handleGetAudio ---
-  // ────────────────────────────────────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // DEVICE UPDATES
+  // ---------------------------------------------------------------------------
   const handleGetAudio = async () => {
-    LOG('Get Audio clicked');
-    try {
-      if (audioContextRef.current?.state === 'suspended') {
-        await audioContextRef.current.resume();
-        LOG('AudioContext resumed on audio grant');
-      }
-
-      if (inputDevices.length === 0) {
-        await updateAudioDevices();
-      }
-      
-      const audioConstraints = {
-        echoCancellation: echoCancellation,
-        noiseSuppression: noiseSuppression,
-        autoGainControl: autoGainControl,
-        deviceId: selectedInputId ? { exact: selectedInputId } : undefined,
-        sampleRate: { ideal: parseInt(audioSampleRate, 10) },
-        latency: parseFloat(audioLatency)
-      };
-      
-      LOG('Requesting audio with constraints:', audioConstraints);
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
-      setLocalAudioStream(stream);
-      LOG('Got audio stream:', stream.getTracks().map(t => t.id));
-    } catch (err) {
-      ERR('Error getting microphone:', err);
-      alert(`Error getting mic: ${err.message}. Your hardware might not support the selected settings.`);
-    }
-  };
-
-  const handleStartAudio = async () => {
-    if (!localAudioStream) {
-      alert('Get microphone first');
-      return;
-    }
-    LOG('StartAudio…');
-    try {
-      await mediasoupService.createSendTransport();
-      LOG('Send transport ready');
-      const track = localAudioStream.getAudioTracks()[0];
-
-      const producer = await mediasoupService.produce(track, {
-        opusStereo: opusStereo,
-        opusDtx: opusDtx,
-        opusFec: opusFec,
-      });
-      
-      setMyAudioProducer(producer);
-      LOG('Producing audio; producerId=', producer?.id);
-    } catch (e) {
-      ERR('StartAudio failed', e);
-    }
-  };
-
-  const handleStopAudio = () => {
-    if (myAudioProducer) {
-      LOG('StopAudio; closing producer', myAudioProducer.id);
-      try { myAudioProducer.close(); } catch (e) { WARN('producer.close error', e); }
-      setMyAudioProducer(null);
-    }
-    if (localAudioStream) {
-      try { localAudioStream.getTracks().forEach(track => track.stop()); } catch (e) { WARN('localAudioStream.stop error', e); }
-      setLocalAudioStream(null);
-    }
-  };
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // --- NEW: Local Video Handlers ---
-  // ────────────────────────────────────────────────────────────────────────────
-  const handleGetVideo = async () => {
-    LOG('Get Video clicked');
-    try {
-      if (videoDevices.length === 0) {
-        await updateVideoDevices();
-      }
-
-      const res = videoResolution.split('p')[0]; // "720p" -> "720"
-      const constraints = {
-        width: { ideal: res === '1080' ? 1920 : 1280 },
-        height: { ideal: parseInt(res, 10) },
-        frameRate: { ideal: parseInt(videoFramerate, 10) },
-        deviceId: selectedVideoInputId ? { exact: selectedVideoInputId } : undefined,
-      };
-
-      LOG('Requesting video with constraints:', constraints);
-      const stream = await navigator.mediaDevices.getUserMedia({ video: constraints });
-      setLocalVideoStream(stream);
-      LOG('Got video stream:', stream.getTracks().map(t => t.id));
-    } catch (err) {
-      ERR('Error getting video:', err);
-      alert(`Error getting video: ${err.message}.`);
-    }
-  };
-
-  const handleStartVideo = async () => {
-    if (!localVideoStream) {
-      alert('Get webcam first');
-      return;
-    }
-    LOG('StartVideo…');
-    try {
-      await mediasoupService.createSendTransport();
-      LOG('Send transport ready for video');
-      const track = localVideoStream.getVideoTracks()[0];
-
-      const res = videoResolution.split('p')[0];
-      const videoConstraints = {
-        width: { ideal: res === '1080' ? 1920 : 1280 },
-        height: { ideal: parseInt(res, 10) },
-        frameRate: { ideal: parseInt(videoFramerate, 10) },
-      };
-
-      const producer = await mediasoupService.produce(track, {}, videoConstraints);
-      
-      setMyVideoProducer(producer);
-      LOG('Producing video; producerId=', producer?.id);
-    } catch (e) {
-      ERR('StartVideo failed', e);
-    }
-  };
-
-  const handleStopVideo = () => {
-    if (myVideoProducer) {
-      LOG('StopVideo; closing producer', myVideoProducer.id);
-      try { myVideoProducer.close(); } catch (e) { WARN('video producer.close error', e); }
-      setMyVideoProducer(null);
-    }
-    if (localVideoStream) {
-      try { localVideoStream.getTracks().forEach(track => track.stop()); } catch (e) { WARN('localVideoStream.stop error', e); }
-      setLocalVideoStream(null);
-    }
-  };
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // --- REFACTORED: Remote Consumer Handlers ---
-  // ────────────────────────────────────────────────────────────────────────────
-  const handleConsumeJammer = async (socketId) => {
-    const userProducers = producersBySocketId.get(socketId);
-    if (!userProducers) {
-      WARN('No producers found for socketId', socketId);
-      return;
-    }
-
-    LOG('Consuming jammer', socketId, userProducers);
-
-    let audioConsumer, videoConsumer;
-
-    try {
-      // Consume Audio
-      if (userProducers.audio) {
-        audioConsumer = await mediasoupService.consume(userProducers.audio.producerId);
-        LOG('Audio consume OK', audioConsumer.id);
-      }
-      
-      // Consume Video
-      if (userProducers.video) {
-        videoConsumer = await mediasoupService.consume(userProducers.video.producerId);
-        LOG('Video consume OK', videoConsumer.id);
-      }
-
-      // Add to state
-      setConsumersBySocketId(prev => {
-        const next = new Map(prev);
-        next.set(socketId, {
-          audio: audioConsumer,
-          video: videoConsumer,
-        });
-        return next;
-      });
-
-    } catch (err) {
-      ERR('handleConsumeJammer failed:', err);
-    }
-  };
-
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // Metronome (DataChannel) - (Unchanged)
-  // ────────────────────────────────────────────────────────────────────────────
-  const playClick = () => {
-    if (!audioContextRef.current || !clickBufferRef.current) {
-      WARN('playClick called without audioContext or buffer');
-      return;
-    }
-    const state = audioContextRef.current.state;
-    if (state === 'suspended') {
-      LOG('AudioContext is suspended; click may be silent until resume()');
-    }
-    const src = audioContextRef.current.createBufferSource();
-    src.buffer = clickBufferRef.current;
-    src.connect(audioContextRef.current.destination);
-    src.start(0);
-  };
-
-  const startLeaderMetronome = async (bpm = 120) => {
-    LOG('[ROOM] startLeaderMetronome request; isLeader?', isLeader, 'bpm', bpm);
-    if (!isLeader)
-      return alert('Only the leader can start the metronome.');
-
-    // --- FIX: 1. Enable local playback ---
-    setIsMetronomeEnabled(true);
-    metronomeStateRef.current.isEnabled = true;
-    // --- END FIX ---
-
-    await mediasoupService.createSendTransport();
-
-    if (metronomeSenderRef.current.dp) {
-      LOG('[ROOM] leader metronome already running; ignoring');
-      return;
-    }
-
-    const dp = await mediasoupService.createDataProducer({
-      label: 'metronome',
-      protocol: 'json',
-    });
-    LOG('[ROOM] leader DataProducer ready', dp.id, dp.readyState);
-    metronomeSenderRef.current.dp = dp;
-    const periodMs = Math.max(1, Math.floor(60000 / bpm)); 
-    metronomeSenderRef.current.interval = setInterval(() => {
+    if (inputDevices.length === 0) {
       try {
-        if (dp.readyState !== 'open') {
-          WARN('[ROOM] metronome send skipped; channel not open. state=', dp.readyState);
-          return;
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        const devs = await navigator.mediaDevices.enumerateDevices();
+        setInputDevices(devs.filter(d => d.kind === 'audioinput'));
+        setOutputDevices(devs.filter(d => d.kind === 'audiooutput'));
+        if(!selectedInputId) setSelectedInputId(devs.find(d => d.kind === 'audioinput')?.deviceId);
+      } catch(e) { ERR(e.message); }
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: selectedInputId ? { exact: selectedInputId } : undefined,
+          echoCancellation, noiseSuppression, autoGainControl,
+          sampleRate: { ideal: parseInt(audioSampleRate) },
+          latency: parseFloat(audioLatency)
         }
-        const msg = { type: 'tick', at: Date.now() };
-        dp.send(JSON.stringify(msg));
-      } catch (e) {
-        ERR('[ROOM] metronome send failed', e);
-      }
-    }, periodMs);
-    LOG('[ROOM] metronome interval started', { bpm, periodMs });
-
-    // --- FIX: 2. Manually subscribe to our own producer ---
-    setMetronomeDataProducer({
-      id: dp.id,
-      label: dp.label,
-      ownerSocketId: socketService.socket.id 
-    });
-    await subscribeMetronomeIfReady(); 
-    // --- END FIX ---
+      });
+      setLocalAudioStream(stream);
+      LOG('Mic acquired.');
+    } catch(e) { ERR('Mic error:', e.message); }
   };
 
-  const stopLeaderMetronome = () => {
-    LOG('[ROOM] stopLeaderMetronome called');
-
-    // --- FIX: 1. Stop local playback ---
-    setIsMetronomeEnabled(false);
-    metronomeStateRef.current.isEnabled = false;
-    // --- END FIX ---
-
-    const { dp, interval } = metronomeSenderRef.current;
-    if (interval) clearInterval(interval);
-    metronomeSenderRef.current.interval = null;
-
-    if (dp) {
-      try { dp.close?.(); } catch (e) { WARN('[ROOM] dp.close error', e); }
+  const handleGetVideo = async () => {
+    if (videoDevices.length === 0) {
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        const devs = await navigator.mediaDevices.enumerateDevices();
+        setVideoDevices(devs.filter(d => d.kind === 'videoinput'));
+        if(!selectedVideoInputId) setSelectedVideoInputId(devs.find(d => d.kind === 'videoinput')?.deviceId);
+      } catch(e) { ERR(e.message); }
     }
-    metronomeSenderRef.current.dp = null;
-    
-    // --- FIX: 2. Clear producer state and subscription ---
-    setMetronomeDataProducer(null);
-    setIsMetronomeConsuming(false);
-    // --- END FIX ---
-  };
-
-  const subscribeMetronomeIfReady = async () => {
-    if (!metronomeDataProducer?.id) {
-      LOG('subscribeMetronomeIfReady: no metronomeDataProducer yet');
-      return;
-    }
-    if (isMetronomeConsuming) {
-      LOG('subscribeMetronomeIfReady: already consuming data');
-      return;
-    }
-    LOG('Subscribing to metronome data…', metronomeDataProducer.id);
-    await mediasoupService.consumeData(
-      metronomeDataProducer.id,
-      async (msg) => {
-        if (msg?.type === 'tick' && metronomeStateRef.current.isEnabled) {
-          if (audioContextRef.current?.state === 'suspended') {
-            try { await audioContextRef.current.resume(); LOG('AudioContext resumed for click'); } catch {}
-          }
-          playClick();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: selectedVideoInputId ? { exact: selectedVideoInputId } : undefined,
+          width: { ideal: videoResolution === '1080p' ? 1920 : (videoResolution === '720p' ? 1280 : 640) },
+          frameRate: { ideal: parseInt(videoFramerate) }
         }
-      }
-    );
-    setIsMetronomeConsuming(true);
-  };
-
-  useEffect(() => {
-    LOG('metronome effect', {
-      isMetronomeEnabled,
-      metronomeDataProducerId: metronomeDataProducer?.id,
-    });
-    if (isMetronomeEnabled) subscribeMetronomeIfReady();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMetronomeEnabled, metronomeDataProducer?.id]);
-
-  const handleToggleMetronome = async () => {
-    const next = !isMetronomeEnabled;
-    LOG('Toggle metronome →', next);
-    setIsMetronomeEnabled(next);
-    metronomeStateRef.current.isEnabled = next;
-    if (next) {
-      if (audioContextRef.current?.state === 'suspended') {
-        try { await audioContextRef.current.resume(); LOG('AudioContext resumed on toggle'); } catch {}
-      }
-      await subscribeMetronomeIfReady();
-    }
+      });
+      setLocalVideoStream(stream);
+      LOG('Cam acquired.');
+    } catch(e) { ERR('Cam error:', e.message); }
   };
 
   // ---------------------------------------------------------------------------
-  // Card Component (Helper for styling)
-  // ---------------------------------------------------------------------------
-  const Card = ({ title, icon, children, className = '' }) => (
-    <div className={`bg-neutral-900 border border-neutral-800 p-5 rounded-lg shadow-lg ${className} ${!isConnected ? 'opacity-50 grayscale' : ''}`}>
-      <h2 className="text-xl font-semibold mb-4 border-b border-neutral-700 pb-3 flex items-center gap-2">
-        {icon}
-        {title}
-      </h2>
-      <div className="space-y-3">
-        {children}
-      </div>
-    </div>
-  );
-  
-  // ---------------------------------------------------------------------------
-  // Button Component (Helper for styling)
-  // ---------------------------------------------------------------------------
-  const Button = ({ onClick, disabled, children, className = '', icon }) => (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`w-full px-4 py-2.5 font-medium text-white rounded-md shadow-sm transition-all flex items-center justify-center gap-2
-        ${className} 
-        ${disabled ? 'bg-neutral-600 cursor-not-allowed' : 'hover:brightness-110'}
-      `}
-    >
-      {icon}
-      <span>{children}</span>
-    </button>
-  );
-
-  // ---------------------------------------------------------------------------
-  // RENDER UI
+  // RENDER
   // ---------------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-200 p-4 md:p-8 font-sans">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <header className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-white">
-              Jam Room
-            </h1>
-            <p className="text-lg text-neutral-400">
-              Room ID:{' '}
-              <code className="text-indigo-400 bg-neutral-800 px-2 py-1 rounded-md font-mono">
-                {roomId}
-              </code>
-            </p>
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <div className="lg:col-span-4 space-y-6">
+          <header>
+            <h1 className="text-3xl font-bold text-white">Jam Room <span className="text-indigo-500">Beta</span></h1>
+            <p className="text-neutral-500 font-mono text-xs mt-1">ID: {roomId}</p>
+            <div className={`mt-4 inline-flex items-center gap-2 py-1 px-3 rounded-full border text-xs font-mono ${isConnected ? 'bg-green-900/30 border-green-800 text-green-400' : 'bg-red-900/30 border-red-800 text-red-400'}`}>
+              {isConnected ? <IconPlug /> : <IconPlugOff />} {isConnected ? 'CONNECTED' : 'DISCONNECTED'}
+            </div>
+          </header>
+
+          <Card title="Connection" icon={<IconPlug />}>
+            <Button onClick={() => {
+              if(isConnected) return;
+              socketService.connect(process.env.NEXT_PUBLIC_SIGNAL_URL || 'http://localhost:4000', () => {
+                socketService.joinRoom(roomId, async (reply) => {
+                  if (reply.error) { ERR(reply.error); return; }
+                  const { routerRtpCapabilities, existingProducers, existingDataProducers, otherParticipantIds, metronomeLeaderSocketId: lId } = reply;
+                  setParticipantIds(otherParticipantIds);
+                  await mediasoupService.loadDevice(routerRtpCapabilities);
+                  await mediasoupService.createRecvTransport();
+                  
+                  const seeded = new Map();
+                  existingProducers.forEach(p => {
+                    const u = seeded.get(p.ownerSocketId) || {};
+                    if (p.kind === 'audio') u.audio = p;
+                    if (p.kind === 'video') u.video = p;
+                    seeded.set(p.ownerSocketId, u);
+                  });
+                  setProducersBySocketId(seeded);
+
+                  setMetronomeLeaderSocketId(lId);
+                  setIsLeader(!!lId && lId === socketService.socket?.id);
+                  const metro = existingDataProducers.find(d => d.label === 'metronome' && d.ownerSocketId === lId);
+                  if (metro) setMetronomeDataProducer({ id: metro.dataProducerId, label: metro.label, ownerSocketId: metro.ownerSocketId });
+
+                  setIsConnected(true);
+                  LOG('Joined room.');
+                });
+              });
+            }} disabled={isConnected} className={isConnected ? 'bg-green-800' : 'bg-indigo-600 hover:bg-indigo-500'}>
+              {isConnected ? 'Joined Room' : 'Connect to Room'}
+            </Button>
+          </Card>
+
+          <LogTerminal logs={logs} />
+          <div className="grid grid-cols-1 gap-2">
+            <button onClick={checkLatencyStats} className="bg-neutral-800 hover:bg-neutral-700 text-xs py-2 rounded border border-neutral-700 text-neutral-300 w-full font-mono">
+              Measure Latency (RTT/Jitter)
+            </button>
           </div>
-          <div 
-            className={`flex items-center gap-2 py-2 px-4 rounded-lg border
-              ${isConnected 
-                ? 'bg-green-900/50 border-green-700 text-green-300' 
-                : 'bg-red-900/50 border-red-700 text-red-300'
-              }
-            `}
-          >
-            {isConnected ? <IconPlug /> : <IconPlugOff />}
-            <span className="font-medium text-sm">{isConnected ? 'Connected' : 'Disconnected'}</span>
-          </div>
-        </header>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          {/* --------------------------------------------------- */}
-          {/* Left Column: Core Controls                          */}
-          {/* --------------------------------------------------- */}
-          <div className="md:col-span-1 space-y-6">
-            
-            <Card title="Connection" icon={<IconPlug />}>
-              <Button
-                onClick={handleConnect}
-                disabled={isConnected}
-                className={isConnected ? 'bg-green-700' : 'bg-indigo-600 hover:bg-indigo-500'}
-              >
-                {isConnected ? 'Connected' : 'Connect to Room'}
-              </Button>
-            </Card>
-
-            {/* --- NEW: Local Video Card --- */}
-            <Card title="Local Video" icon={<IconVideo />} className={!isConnected ? 'pointer-events-none' : ''}>
-              <div className="w-full aspect-video bg-neutral-800 rounded-md overflow-hidden">
-                {localVideoStream && (
-                  <video
-                    ref={el => { if (el) el.srcObject = localVideoStream; }}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover"
-                  />
-                )}
+        <div className="lg:col-span-4 space-y-6">
+          <Card title="Receiver (Latency)" icon={<IconSettings />}>
+            <div className="p-3">
+              <label className="block text-sm font-medium text-neutral-200 mb-2">Receiver Jitter Buffer</label>
+              <div className="flex items-center gap-4">
+                <input type="range" min="0" max="0.5" step="0.005" value={receiverPlayoutDelay} onChange={e => {
+                  const v = parseFloat(e.target.value);
+                  setReceiverPlayoutDelay(v);
+                  consumersBySocketId.forEach(c => c.audio && mediasoupService.setConsumerPlayoutDelay(c.audio.id, v));
+                }} className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
+                <span className="font-mono text-xs bg-neutral-800 px-2 py-1 rounded text-indigo-300 w-16 text-center">{receiverPlayoutDelay}s</span>
               </div>
-              <SettingsSelect
-                label="Input Device (Webcam)"
-                value={selectedVideoInputId}
-                onChange={(e) => setSelectedVideoInputId(e.target.value)}
-                disabled={!!localVideoStream || videoDevices.length === 0}
-              >
-                {videoDevices.length === 0 && <option>Click "Get Cam" to populate</option>}
-                {videoDevices.map(d => (
-                  <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
-                ))}
-              </SettingsSelect>
-              <SettingsSelect
-                label="Resolution"
-                value={videoResolution}
-                onChange={(e) => setVideoResolution(e.target.value)}
-                disabled={!!localVideoStream}
-              >
-                <option value="360p">640x360 (Low)</option>
-                <option value="720p">1280x720 (Default)</option>
-                <option value="1080p">1920x1080 (High)</option>
-              </SettingsSelect>
-              <SettingsSelect
-                label="Framerate"
-                value={videoFramerate}
-                onChange={(e) => setVideoFramerate(e.target.value)}
-                disabled={!!localVideoStream}
-              >
-                <option value="15">15 fps (Low)</option>
-                <option value="30">30 fps (Standard)</option>
-              </SettingsSelect>
+              <p className="text-xs text-neutral-500 mt-2">0s = Real-time (may click). 0.02s = Safe.</p>
+            </div>
+          </Card>
 
-              <div className="pt-4 border-t border-neutral-700 space-y-3">
-                <Button
-                  onClick={handleGetVideo}
-                  disabled={!isConnected || !!localVideoStream}
-                  className="bg-blue-600 hover:bg-blue-500"
-                  icon={<IconVideoOff />}
-                >
-                  {localVideoStream ? 'Webcam Active' : 'Get Webcam'}
-                </Button>
-                {!myVideoProducer ? (
-                  <Button
-                    onClick={handleStartVideo}
-                    disabled={!isConnected || !localVideoStream}
-                    className="bg-green-600 hover:bg-green-500"
-                    icon={<IconPlay />}
-                  >
-                    Start Video
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handleStopVideo}
-                    className="bg-red-600 hover:bg-red-500"
-                    icon={<IconStop />}
-                  >
-                    Stop Video
-                  </Button>
-                )}
-              </div>
-            </Card>
+          <Card title="Microphone" icon={<IconMic />} className={!isConnected ? 'opacity-50 pointer-events-none' : ''}>
+             <div className="space-y-4">
+               <div className="grid grid-cols-2 gap-2">
+                 <Button onClick={handleGetAudio} disabled={!!localAudioStream} className="bg-blue-700 hover:bg-blue-600 text-xs" icon={<IconMicOff />}>Init Mic</Button>
+                 {!myAudioProducer ? 
+                   <Button onClick={async () => {
+                     if(!localAudioStream) return;
+                     try {
+                       await mediasoupService.createSendTransport();
+                       const t = localAudioStream.getAudioTracks()[0];
+                       const p = await mediasoupService.produce(t, { opusStereo, opusDtx, opusFec });
+                       setMyAudioProducer(p);
+                       LOG('Producing Audio.');
+                     } catch(e) { ERR(e.message); }
+                   }} disabled={!localAudioStream} className="bg-green-700 hover:bg-green-600 text-xs" icon={<IconPlay />}>On Air</Button> :
+                   <Button onClick={() => { myAudioProducer?.close(); setMyAudioProducer(null); localAudioStream?.getTracks().forEach(t=>t.stop()); setLocalAudioStream(null); LOG('Audio Stopped'); }} className="bg-red-700 hover:bg-red-600 text-xs" icon={<IconStop />}>Off Air</Button>
+                 }
+               </div>
+               
+               <SettingsSelect label="Device" value={selectedInputId} onChange={e=>setSelectedInputId(e.target.value)} disabled={!!localAudioStream}>{inputDevices.map(d=><option key={d.deviceId} value={d.deviceId}>{d.label}</option>)}</SettingsSelect>
+               
+               <div className="grid grid-cols-2 gap-2">
+                 <div className="bg-neutral-800 p-2 rounded border border-neutral-700 space-y-1">
+                   <p className="text-[10px] font-bold text-neutral-500 uppercase">DSP</p>
+                   <SettingsCheckbox label="Echo Canc." checked={echoCancellation} onChange={e=>setEchoCancellation(e.target.checked)} disabled={!!localAudioStream} />
+                   <SettingsCheckbox label="Noise Supp." checked={noiseSuppression} onChange={e=>setNoiseSuppression(e.target.checked)} disabled={!!localAudioStream} />
+                 </div>
+                 <div className="bg-neutral-800 p-2 rounded border border-neutral-700 space-y-1">
+                   <p className="text-[10px] font-bold text-neutral-500 uppercase">Codec</p>
+                   <SettingsCheckbox label="Stereo" checked={opusStereo} onChange={e=>setOpusStereo(e.target.checked)} disabled={!!myAudioProducer} />
+                   <SettingsCheckbox label="FEC" checked={opusFec} onChange={e=>setOpusFec(e.target.checked)} disabled={!!myAudioProducer} />
+                 </div>
+               </div>
+             </div>
+          </Card>
 
-            <Card title="Local Audio Settings" icon={<IconMic />} className={!isConnected ? 'pointer-events-none' : ''}>
-              
-              <SettingsSelect
-                label="Input Device (Microphone)"
-                value={selectedInputId}
-                onChange={(e) => setSelectedInputId(e.target.value)}
-                disabled={!!localAudioStream || inputDevices.length === 0}
-              >
-                {inputDevices.length === 0 && <option>Click "Get Mic" to populate</option>}
-                {inputDevices.map(d => (
-                  <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
-                ))}
-              </SettingsSelect>
-              
-              <SettingsSelect
-                label="Output Device (Speakers)"
-                value={selectedOutputId}
-                onChange={(e) => setSelectedOutputId(e.target.value)}
-                disabled={outputDevices.length === 0}
-              >
-                {outputDevices.length === 0 && <option>Click "Get Mic" to populate</option>}
-                {outputDevices.map(d => (
-                  <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
-                ))}
-              </SettingsSelect>
-              <p className="text-xs text-neutral-400 px-3 -mt-2">
-                Note: Metronome audio always uses the system default output.
-              </p>
+          <Card title="Webcam" icon={<IconVideo />} className={!isConnected ? 'opacity-50 pointer-events-none' : ''}>
+            <div className="space-y-4">
+               <div className="aspect-video bg-neutral-800 rounded overflow-hidden">
+                 {localVideoStream && <video ref={el=>{if(el)el.srcObject=localVideoStream}} autoPlay playsInline muted className="w-full h-full object-cover" />}
+               </div>
+               <div className="grid grid-cols-2 gap-2">
+                 <Button onClick={handleGetVideo} disabled={!!localVideoStream} className="bg-blue-700 hover:bg-blue-600 text-xs" icon={<IconVideoOff />}>Init Cam</Button>
+                 {!myVideoProducer ? 
+                    <Button onClick={async () => {
+                       if(!localVideoStream) return;
+                       try {
+                         await mediasoupService.createSendTransport();
+                         const t = localVideoStream.getVideoTracks()[0];
+                         const p = await mediasoupService.produce(t, {}, { 
+                           height: { ideal: videoResolution === '1080p' ? 1920 : (videoResolution === '720p' ? 1280 : 640) },
+                           frameRate: { ideal: parseInt(videoFramerate) }
+                         });
+                         setMyVideoProducer(p);
+                         LOG('Producing Video');
+                       } catch(e) { ERR(e.message); }
+                    }} disabled={!localVideoStream} className="bg-green-700 hover:bg-green-600 text-xs" icon={<IconPlay />}>On Air</Button> :
+                    <Button onClick={() => { myVideoProducer?.close(); setMyVideoProducer(null); localVideoStream?.getTracks().forEach(t=>t.stop()); setLocalVideoStream(null); }} className="bg-red-700 hover:bg-red-600 text-xs" icon={<IconStop />}>Off Air</Button>
+                 }
+               </div>
+               <SettingsSelect label="Resolution" value={videoResolution} onChange={e=>setVideoResolution(e.target.value)} disabled={!!localVideoStream}>
+                 <option value="360p">360p (Performance)</option>
+                 <option value="720p">720p (HD)</option>
+               </SettingsSelect>
+            </div>
+          </Card>
+        </div>
 
-              <div className="pt-4 border-t border-neutral-700 space-y-3">
-                <Button
-                  onClick={handleGetAudio}
-                  disabled={!isConnected || !!localAudioStream}
-                  className="bg-blue-600 hover:bg-blue-500"
-                  icon={<IconMicOff />}
-                >
-                  {localAudioStream ? 'Mic Active' : 'Get Microphone'}
-                </Button>
+        <div className="lg:col-span-4 space-y-6">
+           <Card title="Metronome" icon={<IconMetronome />} className={!isConnected ? 'opacity-50 pointer-events-none' : ''}>
+             <Button onClick={handleToggleMetronome} disabled={!metronomeLeaderSocketId} className={isMetronomeEnabled ? 'bg-red-700 hover:bg-red-600' : 'bg-neutral-700 hover:bg-neutral-600'}>
+                {isMetronomeEnabled ? 'Mute Click' : 'Unmute Click'}
+             </Button>
+             {isLeader && (
+               <div className="mt-2 pt-2 border-t border-neutral-700 flex gap-2">
+                 <Button onClick={() => startLeaderMetronome(120)} className="bg-indigo-700 text-xs">Start 120</Button>
+                 <Button onClick={stopLeaderMetronome} className="bg-neutral-700 text-xs">Stop</Button>
+               </div>
+             )}
+             {!isLeader && metronomeLeaderSocketId && (
+                <p className="text-xs text-center mt-2 text-neutral-400">Follower Mode</p>
+             )}
+          </Card>
 
-                {!myAudioProducer ? (
-                  <Button
-                    onClick={handleStartAudio}
-                    disabled={!isConnected || !localAudioStream}
-                    className="bg-green-600 hover:bg-green-500"
-                    icon={<IconPlay />}
-                  >
-                    Start Producing
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handleStopAudio}
-                    className="bg-red-600 hover:bg-red-500"
-                    icon={<IconStop />}
-                  >
-                    Stop Producing
-                  </Button>
-                )}
-              </div>
-              
-              <div className="pt-4 border-t border-neutral-700 space-y-1">
-                <h3 className="text-sm font-medium text-neutral-300 px-3 pb-2">
-                  Mic Processing
-                </h3>
-                <SettingsCheckbox
-                  label="Echo Cancellation"
-                  description="Recommended without headphones"
-                  checked={echoCancellation}
-                  onChange={(e) => setEchoCancellation(e.target.checked)}
-                  disabled={!!localAudioStream}
-                />
-                <SettingsCheckbox
-                  label="Noise Suppression"
-                  description="Filters out background noise"
-                  checked={noiseSuppression}
-                  onChange={(e) => setNoiseSuppression(e.target.checked)}
-                  disabled={!!localAudioStream}
-                />
-                <SettingsCheckbox
-                  label="Auto Gain Control"
-                  description="Adjusts mic volume automatically"
-                  checked={autoGainControl}
-                  onChange={(e) => setAutoGainControl(e.target.checked)}
-                  disabled={!!localAudioStream}
-                />
-                {!!localAudioStream && (
-                  <p className="text-xs text-indigo-300 px-3 pt-2">
-                    Stop your mic to change these settings.
-                  </p>
-                )}
-              </div>
-              
-              <div className="pt-4 border-t border-neutral-700 space-y-1">
-                <h3 className="text-sm font-medium text-neutral-300 px-3 pb-2">
-                  Mic Quality (Advanced)
-                </h3>
-                <SettingsSelect
-                  label="Sample Rate (Request)"
-                  value={audioSampleRate}
-                  onChange={(e) => setAudioSampleRate(e.target.value)}
-                  disabled={!!localAudioStream}
-                >
-                  <option value="48000">48000 Hz (Pro Audio)</option>
-                  <option value="44100">44100 Hz (CD Quality)</option>
-                  <option value="16000">16000 Hz (Speech)</option>
-                </SettingsSelect>
-                <SettingsSelect
-                  label="Buffer Size / Latency (Hint)"
-                  value={audioLatency}
-                  onChange={(e) => setAudioLatency(e.target.value)}
-                  disabled={!!localAudioStream}
-                >
-                  <option value="0">0 (Browser Default)</option>
-                  <option value="0.005">0.005s (Lowest Latency)</option>
-                  <option value="0.01">0.01s (Interactive)</option>
-                  <option value="0.02">0.02s (Stable)</option>
-                </SettingsSelect>
-                {!!localAudioStream && (
-                  <p className="text-xs text-indigo-300 px-3 pt-2">
-                    Stop your mic to change these settings.
-                  </p>
-                )}
-              </div>
-
-              <div className="pt-4 border-t border-neutral-700 space-y-1">
-                <h3 className="text-sm font-medium text-neutral-300 px-3 pb-2">
-                  Codec Quality (Advanced)
-                </h3>
-                <SettingsCheckbox
-                  label="Stereo Audio"
-                  description="Send 2 channels (music)"
-                  checked={opusStereo}
-                  onChange={(e) => setOpusStereo(e.target.checked)}
-                  disabled={!!myAudioProducer}
-                />
-                <SettingsCheckbox
-                  label="Forward Error Correction (FEC)"
-                  description="Better quality on bad networks"
-                  checked={opusFec}
-                  onChange={(e) => setOpusFec(e.target.checked)}
-                  disabled={!!myAudioProducer}
-                />
-                <SettingsCheckbox
-                  label="Discontinuous Transmission (DTX)"
-                  description="Stops sending on silence (bad for music)"
-                  checked={opusDtx}
-                  onChange={(e) => setOpusDtx(e.target.checked)}
-                  disabled={!!myAudioProducer}
-                />
-                {!!myAudioProducer && (
-                  <p className="text-xs text-indigo-300 px-3 pt-2">
-                    Stop producing to change codec settings.
-                  </p>
-                )}
-              </div>
-
-            </Card>
-
-            <Card title="Metronome" icon={<IconMetronome />} className={!isConnected ? 'pointer-events-none' : ''}>
-              <Button
-                onClick={handleToggleMetronome}
-                disabled={!isConnected || !metronomeLeaderSocketId}
-                className={
-                  isMetronomeEnabled
-                    ? 'bg-red-600 hover:bg-red-500'
-                    : 'bg-neutral-700 hover:bg-neutral-600'
-                }
-              >
-                {isMetronomeEnabled ? 'Stop Click' : 'Start Click'}
-              </Button>
-              
-              {!metronomeDataProducer?.id && (
-                <p className="text-xs text-neutral-400 text-center">
-                  Waiting for leader’s metronome stream…
-                </p>
-              )}
-
-              {isLeader && (
-                <div className="pt-3 border-t border-neutral-700 space-y-2">
-                  <p className="text-sm text-center font-medium text-indigo-300">You are the leader</p>
-                  <Button
-                    onClick={() => startLeaderMetronome(120)}
-                    className="bg-indigo-700 hover:bg-indigo-600"
-                  >
-                    Start Leader Metronome (120 BPM)
-                  </Button>
-                  <Button
-                    onClick={stopLeaderMetronome}
-                    className="bg-neutral-700 hover:bg-neutral-600"
-                  >
-                    Stop Leader Metronome
-                  </Button>
+           <Card title="Session Mix" icon={<IconSpeaker />} className={!isConnected ? 'opacity-50 pointer-events-none' : ''}>
+             {Array.from(consumersBySocketId.entries()).map(([sid, consumers]) => (
+               <div key={sid} className="bg-neutral-800 p-3 rounded border border-neutral-700 mb-2">
+                 <div className="flex justify-between items-center mb-2">
+                   <div className="flex items-center gap-2"><IconUser /><span className="text-sm font-mono">{sid.slice(0,5)}</span></div>
+                   <div className="text-xs text-green-400">Streaming</div>
+                 </div>
+                 {consumers.video && <div className="aspect-video bg-black rounded overflow-hidden mb-2"><RemoteVideo consumer={consumers.video} /></div>}
+                 <RemoteAudio consumer={consumers.audio} outputDeviceId={selectedOutputId} />
+               </div>
+             ))}
+             {Array.from(producersBySocketId.entries()).filter(([sid]) => !consumersBySocketId.has(sid)).map(([sid, p]) => (
+                <div key={sid} className="bg-neutral-800 p-3 rounded border border-neutral-700 mb-2 flex justify-between items-center opacity-75">
+                   <div className="flex items-center gap-2"><IconUser /><span className="text-sm font-mono">{sid.slice(0,5)}</span></div>
+                   <Button onClick={async () => {
+                      const cs = {};
+                      if(p.audio) { 
+                         const c = await mediasoupService.consume(p.audio.producerId); 
+                         mediasoupService.setConsumerPlayoutDelay(c.id, receiverPlayoutDelay); 
+                         cs.audio = c; 
+                      }
+                      if(p.video) cs.video = await mediasoupService.consume(p.video.producerId);
+                      setConsumersBySocketId(prev => { const n = new Map(prev); n.set(sid, cs); return n; });
+                   }} className="w-auto text-xs bg-green-700 py-1 px-3">Connect</Button>
                 </div>
-              )}
-            </Card>
-          </div>
-
-          {/* --------------------------------------------------- */}
-          {/* Right Column: Streams (Mixer)                       */}
-          {/* --- REFACTORED: Unified Jammer List ---             */}
-          {/* --------------------------------------------------- */}
-          <div className="md:col-span-2 space-y-6">
-
-            <Card title="Jammer Mix" icon={<IconSpeaker />} className={!isConnected ? 'pointer-events-none' : ''}>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                
-                {/* --- RENDER CONNECTED JAMMERS --- */}
-                {Array.from(consumersBySocketId.entries()).map(
-                  ([socketId, consumers]) => (
-                    <div key={socketId} className="bg-neutral-800 p-4 rounded-lg border border-neutral-700 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <div className="text-green-500 flex-shrink-0"><IconUser /></div>
-                        <div>
-                          <p className="text-sm font-medium text-neutral-200">Jammer</p>
-                          <p className="text-xs font-mono text-neutral-400 break-all">{socketId.slice(0, 6)}...</p>
-                        </div>
-                      </div>
-                      
-                      {/* Render video if we have it */}
-                      {consumers.video && (
-                        <div className="aspect-video bg-black rounded-md overflow-hidden">
-                          <RemoteVideo consumer={consumers.video} />
-                        </div>
-                      )}
-                      
-                      {/* We render the <RemoteAudio> component regardless,
-                          it just sits there and does nothing if the consumer is null */}
-                      <RemoteAudio
-                        consumer={consumers.audio}
-                        outputDeviceId={selectedOutputId}
-                      />
-                    </div>
-                  )
-                )}
-
-                {/* --- RENDER AVAILABLE JAMMERS --- */}
-                {Array.from(producersBySocketId.entries())
-                  .filter(([socketId, producers]) => 
-                    !consumersBySocketId.has(socketId) && (producers.audio || producers.video)
-                  )
-                  .map(([socketId, producers]) => (
-                    <div
-                      key={socketId}
-                      className="bg-neutral-800 p-4 rounded-lg flex flex-col justify-between gap-4 border border-neutral-700"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="text-neutral-500 flex-shrink-0"><IconUser /></div>
-                        <div>
-                          <p className="text-sm font-medium text-neutral-300">
-                            Available Jammer
-                          </p>
-                          <p className="text-xs font-mono text-neutral-400 break-all">
-                            ({socketId.slice(0, 6)}…)
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {producers.audio && (
-                          <span className="text-xs bg-neutral-700 text-neutral-300 px-2 py-0.5 rounded-full">Audio</span>
-                        )}
-                        {producers.video && (
-                          <span className="text-xs bg-neutral-700 text-neutral-300 px-2 py-0.5 rounded-full">Video</span>
-                        )}
-                      </div>
-                      
-                      <Button
-                        onClick={() => handleConsumeJammer(socketId)}
-                        disabled={!localAudioStream && !localVideoStream} // Require local media to listen
-                        className="bg-green-600 hover:bg-green-500"
-                      >
-                        Connect to Jammer
-                      </Button>
-                    </div>
-                  ))
-                }
-
-                {producersBySocketId.size === 0 && (
-                  <p className="text-sm text-neutral-400 col-span-full">
-                    Waiting for others to join...
-                  </p>
-                )}
-              </div>
-            </Card>
-
-            <Card title="Participants" icon={<IconUser />} className={!isConnected ? 'pointer-events-none' : ''}>
-              <ul className="space-y-2">
-                {/* Add self to participant list */}
-                {socketService.socket?.id && (
-                  <li className="text-sm text-indigo-300 font-mono text-xs p-3 bg-neutral-800 rounded break-all">
-                    {socketService.socket.id} (You)
-                  </li>
-                )}
-                {participantIds.map((socketId) => (
-                  <li
-                    key={socketId}
-                    className="text-sm text-neutral-300 font-mono text-xs p-3 bg-neutral-800 rounded break-all"
-                  >
-                    {socketId}
-                  </li>
-                ))}
-                {participantIds.length === 0 && (
-                  <p className="text-sm text-neutral-400">
-                    Just you for now!
-                  </p>
-                )}
-              </ul>
-            </Card>
-
-          </div>
+             ))}
+             {producersBySocketId.size === 0 && consumersBySocketId.size === 0 && <p className="text-neutral-500 italic text-sm text-center py-4">Room is empty.</p>}
+           </Card>
         </div>
       </div>
     </div>

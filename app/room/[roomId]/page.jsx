@@ -1,26 +1,27 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation'; // Added useRouter
 import { socketService } from '@/app/services/SocketService';
 import { mediasoupService } from '@/app/services/MediasoupService';
 
 // -----------------------------------------------------------------------------
 // ICONS
 // -----------------------------------------------------------------------------
-const IconMic = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15a3 3 0 0 1-3-3V4.5a3 3 0 0 1 6 0V12a3 3 0 0 1-3 3Z" /></svg>);
-const IconMicOff = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Zm-3.75 3a.75.75 0 0 0-1.5 0v.75a.75.75 0 0 0 1.5 0v-.75ZM12 15.75a.75.75 0 0 1-.75.75H9.75a.75.75 0 0 1 0-1.5h1.5a.75.75 0 0 1 .75.75Zm.75 2.25a.75.75 0 0 0 1.5 0v-.75a.75.75 0 0 0-1.5 0v.75ZM12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15a3 3 0 0 1-3-3V4.5a3 3 0 0 1 6 0V12a3 3 0 0 1-3 3Zm-3.938-6.528A4.5 4.5 0 0 0 6 12v1.5M18 12a4.486 4.486 0 0 0-3.062-4.028M18 13.5v-1.5a4.5 4.5 0 1 0-9 0v1.5m-3.062 4.028A4.486 4.486 0 0 1 6 12m6 9.75v-3.75M3.75 3.75l16.5 16.5" /></svg>);
-const IconPlay = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L8.029 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" /></svg>);
-const IconStop = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" /></svg>);
-const IconPlug = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.83-5.83M11.42 15.17l-4.24-4.24m5.83-5.83L15.17 11.42M12.75 5.1a.75.75 0 0 0-1.06 0l-4.24 4.24a.75.75 0 0 0 0 1.06l4.24 4.24a.75.75 0 0 0 1.06 0l4.24-4.24a.75.75 0 0 0 0-1.06l-4.24-4.24Z" /></svg>);
-const IconPlugOff = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.83-5.83M11.42 15.17l-4.24-4.24m5.83-5.83L15.17 11.42M12.75 5.1a.75.75 0 0 0-1.06 0l-4.24 4.24a.75.75 0 0 0 0 1.06l4.24 4.24a.75.75 0 0 0 0-1.06l-4.24-4.24ZM3 3l18 18" /></svg>);
-const IconUser = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>);
-const IconMetronome = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m9 9 6-6m0 0 6 6m-6-6v6m0 6v6m6-6h6m-6 0H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>);
-const IconSpeaker = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /></svg>);
-const IconVideo = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>);
-const IconVideoOff = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M12 18.75h-7.5a2.25 2.25 0 0 1-2.25-2.25v-9A2.25 2.25 0 0 1 4.5 5.25H9M18 18.75h-7.5a2.25 2.25 0 0 1-2.25-2.25v-9A2.25 2.25 0 0 1 10.5 5.25H18M3 3l18 18" /></svg>);
-const IconTerminal = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" /></svg>);
-const IconSettings = () => (<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 13.5V3.75m0 9.75a1.5 1.5 0 010 3m0-3a1.5 1.5 0 000 3m0 3.75V16.5m12-3V3.75m0 9.75a1.5 1.5 0 010 3m0-3a1.5 1.5 0 000 3m0 3.75V16.5m-6-9V3.75m0 3.75a1.5 1.5 0 010 3m0-3a1.5 1.5 0 000 3m0 9.75V10.5" /></svg>);
+const IconMic = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15a3 3 0 0 1-3-3V4.5a3 3 0 0 1 6 0V12a3 3 0 0 1-3 3Z" /></svg>);
+const IconMicOff = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Zm-3.75 3a.75.75 0 0 0-1.5 0v.75a.75.75 0 0 0 1.5 0v-.75ZM12 15.75a.75.75 0 0 1-.75.75H9.75a.75.75 0 0 1 0-1.5h1.5a.75.75 0 0 1 .75.75Zm.75 2.25a.75.75 0 0 0 1.5 0v-.75a.75.75 0 0 0-1.5 0v.75ZM12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15a3 3 0 0 1-3-3V4.5a3 3 0 0 1 6 0V12a3 3 0 0 1-3 3Zm-3.938-6.528A4.5 4.5 0 0 0 6 12v1.5M18 12a4.486 4.486 0 0 0-3.062-4.028M18 13.5v-1.5a4.5 4.5 0 1 0-9 0v1.5m-3.062 4.028A4.486 4.486 0 0 1 6 12m6 9.75v-3.75M3.75 3.75l16.5 16.5" /></svg>);
+const IconPlay = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L8.029 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" /></svg>);
+const IconStop = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" /></svg>);
+const IconPlug = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.83-5.83M11.42 15.17l-4.24-4.24m5.83-5.83L15.17 11.42M12.75 5.1a.75.75 0 0 0-1.06 0l-4.24 4.24a.75.75 0 0 0 0 1.06l4.24 4.24a.75.75 0 0 0 1.06 0l4.24-4.24a.75.75 0 0 0 0-1.06l-4.24-4.24Z" /></svg>);
+const IconPlugOff = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.83-5.83M11.42 15.17l-4.24-4.24m5.83-5.83L15.17 11.42M12.75 5.1a.75.75 0 0 0-1.06 0l-4.24 4.24a.75.75 0 0 0 0 1.06l4.24 4.24a.75.75 0 0 0 0-1.06l-4.24-4.24ZM3 3l18 18" /></svg>);
+const IconUser = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>);
+const IconMetronome = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m9 9 6-6m0 0 6 6m-6-6v6m0 6v6m6-6h6m-6 0H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>);
+const IconSpeaker = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /></svg>);
+const IconVideo = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>);
+const IconVideoOff = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M12 18.75h-7.5a2.25 2.25 0 0 1-2.25-2.25v-9A2.25 2.25 0 0 1 4.5 5.25H9M18 18.75h-7.5a2.25 2.25 0 0 1-2.25-2.25v-9A2.25 2.25 0 0 1 10.5 5.25H18M3 3l18 18" /></svg>);
+const IconTerminal = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" /></svg>);
+const IconSettings = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 13.5V3.75m0 9.75a1.5 1.5 0 010 3m0-3a1.5 1.5 0 000 3m0 3.75V16.5m12-3V3.75m0 9.75a1.5 1.5 0 010 3m0-3a1.5 1.5 0 000 3m0 3.75V16.5m-6-9V3.75m0 3.75a1.5 1.5 0 010 3m0-3a1.5 1.5 0 000 3m0 9.75V10.5" /></svg>);
+const IconAlert = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>);
 
 // -----------------------------------------------------------------------------
 // GLOBAL LOGGING (Visual Terminal)
@@ -122,6 +123,7 @@ function LogTerminal({ logs }) {
 
 export default function RoomPage() {
   const params = useParams();
+  const router = useRouter(); // For redirecting on room close
   const roomId = params.roomid || params.roomId;
 
   // State
@@ -129,6 +131,10 @@ export default function RoomPage() {
   const [participantIds, setParticipantIds] = useState([]);
   const [logs, setLogs] = useState([]);
   
+  // State: Admin & Policies
+  const [adminAlert, setAdminAlert] = useState(null); // { message, level }
+  const [roomPolicies, setRoomPolicies] = useState({ allowVideo: true });
+
   // State: Media
   const [producersBySocketId, setProducersBySocketId] = useState(new Map());
   const [consumersBySocketId, setConsumersBySocketId] = useState(new Map());
@@ -223,15 +229,8 @@ export default function RoomPage() {
           stats.forEach(report => {
             if (report.type === 'inbound-rtp') {
               reportFound = true;
-              // NOTE: jitterBufferDelay is in seconds, total accumulated. 
-              // Modern browsers may expose 'jitterBufferDelay' as total seconds.
-              // To get average, we divide by emitted count, or just report the packet loss and RTT if available.
-              
               const lost = report.packetsLost || 0;
               const frames = report.framesDecoded || 0;
-              
-              // Round Trip Time is usually on candidate-pair or remote-inbound-rtp, but sometimes exposed here.
-              // We will look for associated remote-inbound-rtp or just log what we have.
               LOG(`[AUDIO FROM ${socketId.slice(0,5)}] PktsLost: ${lost} | Frames: ${frames} | JitterBuffer: ${(report.jitterBufferDelay || 0).toFixed(3)}s`);
             }
             if (report.type === 'candidate-pair' && report.state === 'succeeded') {
@@ -262,25 +261,20 @@ export default function RoomPage() {
   const startLeaderMetronome = async (bpm) => {
     if (!isLeader) return;
     
-    // 1. Enable local playback
     setIsMetronomeEnabled(true);
     metronomeStateRef.current.isEnabled = true;
     if (audioContextRef.current?.state === 'suspended') await audioContextRef.current.resume();
 
-    // 2. Create Producer
     const dp = await mediasoupService.createDataProducer({ label: 'metronome' });
     metronomeSenderRef.current.dp = dp;
     setMetronomeDataProducer({ id: dp.id, label: 'metronome', ownerSocketId: socketService.socket.id });
 
-    // 3. Start interval: Play LOCAL, Send REMOTE
     const intervalMs = 60000 / bpm;
     LOG(`Starting Leader Metronome @ ${bpm} BPM (${intervalMs.toFixed(0)}ms)`);
     
     metronomeSenderRef.current.interval = setInterval(() => {
       if (metronomeStateRef.current.isEnabled) {
-        // Play Locally
         playClick();
-        // Send Remote
         if (dp.readyState === 'open') {
           dp.send(JSON.stringify({ type: 'tick', ts: Date.now() }));
         }
@@ -311,25 +305,21 @@ export default function RoomPage() {
     setIsMetronomeConsuming(true);
   };
 
-  // Toggle (Mute/Unmute)
   const handleToggleMetronome = async () => {
     const next = !isMetronomeEnabled;
     setIsMetronomeEnabled(next);
     metronomeStateRef.current.isEnabled = next;
     if (next && audioContextRef.current?.state === 'suspended') await audioContextRef.current.resume();
-    
-    // Only followers need to subscribe. Leaders are already running the interval.
     if (next && !isLeader) await subscribeMetronomeIfReady();
   };
 
-  // Effects for Metronome
   useEffect(() => {
     if (isMetronomeEnabled && !isLeader) subscribeMetronomeIfReady();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMetronomeEnabled, metronomeDataProducer, isLeader]);
 
   // ---------------------------------------------------------------------------
-  // SOCKET EVENTS
+  // SOCKET EVENTS & ADMIN LISTENERS
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const off1 = socketService.onParticipantJoined(({ socketId }) => {
@@ -382,8 +372,40 @@ export default function RoomPage() {
         setIsMetronomeConsuming(false);
       }
     });
-    return () => { off1(); off2(); off3(); off4(); off5(); off6(); off7(); };
-  }, [metronomeLeaderSocketId, metronomeDataProducer?.id]);
+
+    // --- NEW ADMIN LISTENERS ---
+    const offAdminMsg = socketService.on('adminMessage', (msg) => {
+      LOG('ADMIN BROADCAST:', msg);
+      setAdminAlert(msg);
+      // Auto-hide after 10s
+      setTimeout(() => setAdminAlert(null), 10000);
+    });
+
+    const offPolicy = socketService.on('policyUpdate', (newPolicies) => {
+      LOG('Policy Update:', newPolicies);
+      setRoomPolicies(newPolicies);
+      
+      // Force stop video if policy changed to disallow it
+      if (newPolicies.allowVideo === false && myVideoProducer) {
+        LOG('Policy forced video stop.');
+        myVideoProducer.close();
+        setMyVideoProducer(null);
+        localVideoStream?.getTracks().forEach(t => t.stop());
+        setLocalVideoStream(null);
+      }
+    });
+
+    const offRoomClosed = socketService.on('roomClosed', ({ reason }) => {
+      alert(`Session Terminated: ${reason}`);
+      router.push('/'); // Redirect to home
+    });
+    // ---------------------------
+
+    return () => { 
+      off1(); off2(); off3(); off4(); off5(); off6(); off7(); 
+      offAdminMsg(); offPolicy(); offRoomClosed();
+    };
+  }, [metronomeLeaderSocketId, metronomeDataProducer?.id, myVideoProducer, localVideoStream, router]);
 
   // ---------------------------------------------------------------------------
   // DEVICE UPDATES
@@ -441,6 +463,17 @@ export default function RoomPage() {
     <div className="min-h-screen bg-neutral-950 text-neutral-200 p-4 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
         
+        {/* ADMIN ALERT BANNER */}
+        {adminAlert && (
+          <div className="lg:col-span-12 bg-indigo-900/80 border border-indigo-500 text-indigo-100 px-4 py-3 rounded flex items-start gap-3 shadow-lg animate-pulse">
+             <IconAlert />
+             <div>
+               <p className="font-bold text-sm uppercase">Admin Broadcast</p>
+               <p>{adminAlert.message}</p>
+             </div>
+          </div>
+        )}
+
         <div className="lg:col-span-4 space-y-6">
           <header>
             <h1 className="text-3xl font-bold text-white">Jam Room <span className="text-indigo-500">Beta</span></h1>
@@ -456,7 +489,12 @@ export default function RoomPage() {
               socketService.connect(process.env.NEXT_PUBLIC_SIGNAL_URL || 'http://localhost:4000', () => {
                 socketService.joinRoom(roomId, async (reply) => {
                   if (reply.error) { ERR(reply.error); return; }
-                  const { routerRtpCapabilities, existingProducers, existingDataProducers, otherParticipantIds, metronomeLeaderSocketId: lId } = reply;
+                  
+                  const { routerRtpCapabilities, existingProducers, existingDataProducers, otherParticipantIds, metronomeLeaderSocketId: lId, roomPolicies: rPol } = reply;
+                  
+                  // 1. Apply Policies Immediately
+                  if (rPol) setRoomPolicies(rPol);
+
                   setParticipantIds(otherParticipantIds);
                   await mediasoupService.loadDevice(routerRtpCapabilities);
                   await mediasoupService.createRecvTransport();
@@ -545,7 +583,12 @@ export default function RoomPage() {
           </Card>
 
           <Card title="Webcam" icon={<IconVideo />} className={!isConnected ? 'opacity-50 pointer-events-none' : ''}>
-            <div className="space-y-4">
+             {!roomPolicies.allowVideo && (
+               <div className="absolute inset-0 bg-black/60 z-10 flex items-center justify-center rounded-lg backdrop-blur-sm">
+                 <span className="bg-red-900/80 px-3 py-1 rounded text-xs text-red-200 font-bold">VIDEO DISABLED BY ADMIN</span>
+               </div>
+             )}
+            <div className={`space-y-4 ${!roomPolicies.allowVideo ? 'opacity-20 pointer-events-none' : ''}`}>
                <div className="aspect-video bg-neutral-800 rounded overflow-hidden">
                  {localVideoStream && <video ref={el=>{if(el)el.srcObject=localVideoStream}} autoPlay playsInline muted className="w-full h-full object-cover" />}
                </div>

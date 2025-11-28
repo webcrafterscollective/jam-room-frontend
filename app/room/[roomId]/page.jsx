@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { socketService } from '@/app/services/SocketService';
-import { mediasoupService } from '@/app/services/MediasoupService';
+import { socketService } from '../../services/SocketService';
+import { mediasoupService } from '../../services/MediasoupService';
 
 // -----------------------------------------------------------------------------
 // ASSETS & CONFIG
@@ -11,8 +11,8 @@ import { mediasoupService } from '@/app/services/MediasoupService';
 const ROLE_DEFINITIONS = {
   DRUMMER: { icon: '🥁', label: 'Drummer', priority: 0 },
   BASSIST: { icon: '🎸', label: 'Bassist', priority: 1 },
-  RHYTHM_GUITAR: { icon: 'thm', label: 'Rhythm Gtr', priority: 2 },
-  LEAD_GUITAR: { icon: '🤘', label: 'Lead Gtr', priority: 3 },
+  RHYTHM_GUITAR: { icon: '🎸', label: 'Rhythm Gtr', priority: 2 },
+  LEAD_GUITAR: { icon: '🎸', label: 'Lead Gtr', priority: 3 },
   KEYS: { icon: '🎹', label: 'Keys', priority: 2 },
   VOCALS: { icon: '🎤', label: 'Vocals', priority: 3 },
   SPECTATOR: { icon: '👀', label: 'Spectator', priority: 99 },
@@ -32,7 +32,7 @@ const Button = ({ children, onClick, disabled, className = '', variant = 'primar
   return <button onClick={onClick} disabled={disabled} className={`${base} ${variants[variant]} ${className}`}>{children}</button>;
 };
 
-const UserCard = ({ participant, isMe, latencyStats }) => {
+const UserCard = ({ participant, isMe, serverLatency }) => {
   const roleDef = ROLE_DEFINITIONS[participant.role] || ROLE_DEFINITIONS.SPECTATOR;
   
   return (
@@ -42,7 +42,7 @@ const UserCard = ({ participant, isMe, latencyStats }) => {
           <span className="text-2xl" role="img" aria-label={participant.role}>{roleDef.icon}</span>
           <div>
             <p className="font-bold text-sm text-white leading-tight">
-              {participant.displayName || participant.socketId.slice(0, 5)} 
+              {participant.displayName || participant.socketId?.slice(0, 5)} 
               {isMe && <span className="text-indigo-400 ml-1">(You)</span>}
             </p>
             <p className="text-[10px] font-mono text-neutral-400 uppercase tracking-wider">{roleDef.label}</p>
@@ -53,11 +53,14 @@ const UserCard = ({ participant, isMe, latencyStats }) => {
         )}
       </div>
 
-      {/* Latency Stats Overlay */}
-      {!isMe && latencyStats && (
+      {/* Server Latency Stats */}
+      {serverLatency && (
         <div className="mt-3 grid grid-cols-2 gap-1 text-[10px] font-mono text-neutral-500 bg-black/20 p-1.5 rounded">
-          <div>RTT: <span className={latencyStats.rtt > 100 ? 'text-red-400' : 'text-green-400'}>{latencyStats.rtt}ms</span></div>
-          <div>Jitter: {latencyStats.jitter}ms</div>
+          <div>RTT: <span className={serverLatency.rtt > 100 ? 'text-red-400' : 'text-green-400'}>{serverLatency.rtt}ms</span></div>
+          <div>Jitter: {serverLatency.jitter}ms</div>
+          {participant.syncOffset !== undefined && (
+            <div className="col-span-2">Offset: <span className="text-indigo-400">{participant.syncOffset}ms</span></div>
+          )}
         </div>
       )}
     </div>
@@ -73,16 +76,21 @@ export default function RoomPage() {
   const roomId = params.roomId;
 
   // -- APP STATE --
-  const [step, setStep] = useState('lobby'); // lobby | room
+  const [step, setStep] = useState('lobby');
   const [displayName, setDisplayName] = useState('');
   const [selectedRole, setSelectedRole] = useState('SPECTATOR');
   
   // -- ROOM STATE --
   const [participants, setParticipants] = useState([]);
-  const [latencyMatrix, setLatencyMatrix] = useState({});
-  const [metronomeState, setMetronomeState] = useState({ isPlaying: false, tempo: 120, beatsPerMeasure: 4 });
+  const [myServerLatency, setMyServerLatency] = useState(null);
+  const [metronomeState, setMetronomeState] = useState({ 
+    isPlaying: false, 
+    tempo: 120, 
+    beatsPerMeasure: 4,
+    startTime: 0 
+  });
   const [mySyncOffset, setMySyncOffset] = useState(0);
-  const [serverTimeOffset, setServerTimeOffset] = useState(0); // diff between local Date.now() and server time
+  const [serverTimeOffset, setServerTimeOffset] = useState(0);
   
   // -- MEDIA STATE --
   const [devices, setDevices] = useState({ inputs: [], outputs: [] });
@@ -95,7 +103,6 @@ export default function RoomPage() {
   const schedulerRef = useRef(null);
   const nextNoteTime = useRef(0);
   const beatCount = useRef(0);
-  const socketRef = useRef(null); // Keep a ref for the interval loops
   
   // ---------------------------------------------------------------------------
   // 1. INITIALIZATION & CLEANUP
@@ -133,70 +140,116 @@ export default function RoomPage() {
     const handleEvents = () => {
       // -- Room Events --
       socketService.on('participantJoined', (p) => {
+        console.log('[ROOM] Participant joined:', p);
         setParticipants(prev => {
           if (prev.find(x => x.socketId === p.socketId)) return prev;
-          return [...prev, { ...p, isLeader: false }]; // Defaults
+          return [...prev, { ...p, isLeader: false }];
         });
       });
 
       socketService.on('participantLeft', ({ socketId }) => {
+        console.log('[ROOM] Participant left:', socketId);
         setParticipants(prev => prev.filter(p => p.socketId !== socketId));
-        setLatencyMatrix(prev => {
-          const next = { ...prev };
-          delete next[socketId];
+        
+        // Remove consumer if they leave
+        setRemoteConsumers(prev => {
+          const next = new Map(prev);
+          next.delete(socketId);
           return next;
         });
       });
 
       socketService.on('leaderChanged', ({ newLeaderId }) => {
+        console.log('[ROOM] Leader changed to:', newLeaderId);
         setParticipants(prev => prev.map(p => ({
           ...p,
           isLeader: p.socketId === newLeaderId
         })));
       });
 
-      // -- Sync & Latency Events --
-      socketService.on('peerPing', ({ fromSocketId, pingId, t0 }) => {
-        // Automatically Pong back
-        socketService.pongPeer(fromSocketId, pingId, t0);
+      socketService.on('participantRoleChanged', ({ socketId, newRole }) => {
+        console.log('[ROOM] Role changed:', socketId, newRole);
+        setParticipants(prev => prev.map(p => 
+          p.socketId === socketId ? { ...p, role: newRole } : p
+        ));
       });
 
-      socketService.on('peerPong', ({ fromSocketId, pingId, t0, t1 }) => {
-        const t2 = Date.now(); // We received pong
-        const rtt = t2 - t0;
-        // Report to server for matrix
-        socketService.recordLatency(fromSocketId, rtt);
+      // -- Media Events --
+      socketService.on('newProducer', async ({ producerId, ownerId, kind }) => {
+        console.log('[MEDIA] New Producer:', producerId, 'from', ownerId, 'kind:', kind);
+        
+        if (ownerId === socketService.socket.id) return;
+
+        try {
+          const consumer = await mediasoupService.consume(producerId);
+          setRemoteConsumers(prev => new Map(prev).set(ownerId, consumer));
+        } catch (err) {
+          console.error('[MEDIA] Failed to consume:', err);
+        }
+      });
+
+      socketService.on('consumerClosed', ({ consumerId }) => {
+        console.log('[MEDIA] Consumer closed:', consumerId);
+        setRemoteConsumers(prev => {
+           const next = new Map(prev);
+           for (const [ownerId, consumer] of next.entries()) {
+             if (consumer.id === consumerId) {
+               consumer.close();
+               next.delete(ownerId);
+               break;
+             }
+           }
+           return next;
+        });
+      });
+
+      // ✅ NEW: Sync Offset Update Handler
+      socketService.on('syncOffsetUpdate', ({ syncOffset, serverTime, metronome }) => {
+        console.log('[SYNC] Offset updated:', syncOffset, 'ms');
+        setMySyncOffset(syncOffset);
+        
+        if (metronome) {
+          setMetronomeState(prev => ({ ...prev, ...metronome }));
+        }
+        
+        // If metronome is playing, restart scheduler with new offset
+        if (metronomeState.isPlaying) {
+          stopScheduler();
+          startScheduler(metronomeState.tempo);
+        }
       });
 
       // -- Metronome Events --
       socketService.on('metronomeSync', (state) => {
-        // State includes: isPlaying, tempo, beatsPerMeasure, syncOffset, serverTime
+        console.log('[METRONOME] Sync received:', state);
         setMetronomeState(prev => ({ ...prev, ...state }));
-        if (state.syncOffset !== undefined) setMySyncOffset(state.syncOffset);
         
-        // If playing started, align local engine
+        if (state.syncOffset !== undefined) {
+          setMySyncOffset(state.syncOffset);
+        }
+        
+        // Start/stop scheduler based on state
         if (state.isPlaying && !metronomeState.isPlaying) {
           startScheduler(state.tempo);
-        } else if (!state.isPlaying) {
+        } else if (!state.isPlaying && metronomeState.isPlaying) {
           stopScheduler();
         }
       });
 
-      socketService.on('beatSync', ({ beatNumber, leaderTimestamp, syncOffset }) => {
-        // Visual or audible correction could happen here
-        // Ideally, we schedule the click in the WebAudio graph based on this
+      socketService.on('beatSync', ({ beatNumber, leaderTimestamp, serverTime, syncOffset }) => {
+        // Leader's beat announcement - can be used for visual feedback or correction
+        console.log('[BEAT]', beatNumber, 'offset:', syncOffset);
       });
     };
 
-    // Register generic handlers
     handleEvents();
 
-    // -- Background Loops (Only active when joined) --
+    // -- Background Loops --
     let syncInterval;
     let latencyInterval;
 
-    if (step === 'room') {
-      // A. Clock Sync Loop (Every 10s)
+    if (step === 'room' && socketService.socket) {
+      // ✅ CORRECTED: Clock Sync Loop (Every 10s)
       const syncClock = () => {
         const t0 = Date.now();
         socketService.syncTime({ t0 }, (res) => {
@@ -208,21 +261,28 @@ export default function RoomPage() {
         });
       };
       
-      // B. Latency Matrix Loop (Every 2s)
+      // ✅ CORRECTED: Server Latency Loop (Every 2s)
       const measureLatency = () => {
-        participants.forEach(p => {
-          if (p.socketId === socketService.socket.id) return;
-          const pingId = Math.random().toString(36).substr(2, 5);
-          socketService.pingPeer(p.socketId, pingId, Date.now(), () => {});
-        });
+        const t0 = Date.now();
+        const pingId = Math.random().toString(36).substr(2, 5);
         
-        // Refresh Matrix from server
-        socketService.emit('getLatencyMatrix', null, (res) => {
-          if (res?.matrix) setLatencyMatrix(res.matrix);
+        socketService.pingServer(pingId, t0, (res) => {
+          const t2 = Date.now();
+          const rtt = t2 - t0;
+          
+          // Update local stats
+          setMyServerLatency({ rtt, oneWay: Math.round(rtt / 2) });
+          
+          // Send to backend to trigger cascade recalculation
+          socketService.recordServerLatency(rtt);
         });
       };
 
+      // Initial sync
       syncClock();
+      measureLatency();
+      
+      // Set intervals
       syncInterval = setInterval(syncClock, 10000);
       latencyInterval = setInterval(measureLatency, 2000);
     }
@@ -231,8 +291,7 @@ export default function RoomPage() {
       clearInterval(syncInterval);
       clearInterval(latencyInterval);
     };
-  }, [step, participants, metronomeState.isPlaying]);
-
+  }, [step, metronomeState.isPlaying]);
 
   // ---------------------------------------------------------------------------
   // 3. JOIN LOGIC
@@ -244,26 +303,53 @@ export default function RoomPage() {
       socketService.joinRoom({ roomId, role: selectedRole, displayName }, async (res) => {
         if (res.error) return alert(res.error);
 
+        console.log('[JOIN] Success:', res);
+
         // 1. Initialize Mediasoup
         await mediasoupService.loadDevice(res.rtpCapabilities);
-        await mediasoupService.createRecvTransport(); // Prepare to receive
+        await mediasoupService.createRecvTransport();
 
         // 2. Set State
-        setParticipants(res.participants.map(p => ({
+        const mySocketId = socketService.socket.id;
+        
+        // Add self to participants
+        const allParticipants = [
+          ...res.participants,
+          {
+            socketId: mySocketId,
+            role: selectedRole,
+            displayName,
+            isLeader: res.isLeader,
+            syncOffset: res.syncOffset || 0,
+          }
+        ];
+        
+        setParticipants(allParticipants.map(p => ({
           ...p,
-          isLeader: res.isLeader && p.socketId === socketService.socket.id || p.socketId === res.metronome.leaderId
+          isLeader: p.socketId === res.metronome.leaderId
         })));
+        
         setMetronomeState(res.metronome);
-        if (res.syncTargets) console.log("Syncing to:", res.syncTargets);
+        setMySyncOffset(res.syncOffset || 0);
+        
+        console.log('[SYNC] My sync targets:', res.syncTargets);
+        console.log('[SYNC] My sync offset:', res.syncOffset, 'ms');
         
         // 3. Move to Room
         setStep('room');
         
         // 4. Consume existing producers
-        res.existingProducers.forEach(async (p) => {
-          const consumer = await mediasoupService.consume(p.id);
-          setRemoteConsumers(prev => new Map(prev).set(p.ownerId, consumer));
-        });
+        if (res.existingProducers && Array.isArray(res.existingProducers)) {
+          for (const p of res.existingProducers) {
+            if (p.ownerId === mySocketId) continue;
+            try {
+              const consumer = await mediasoupService.consume(p.id);
+              setRemoteConsumers(prev => new Map(prev).set(p.ownerId, consumer));
+            } catch (err) {
+              console.error('[MEDIA] Failed to consume existing producer:', err);
+            }
+          }
+        }
       });
     });
   };
@@ -273,10 +359,18 @@ export default function RoomPage() {
   // ---------------------------------------------------------------------------
   const toggleAudio = async () => {
     if (activeProducers.audio) {
-      activeProducers.audio.close();
-      socketService.closeProducer(activeProducers.audio.id);
-      setActiveProducers(p => ({ ...p, audio: null }));
+      // MUTE
+      try {
+        const track = activeProducers.audio.track;
+        track.stop();
+        activeProducers.audio.close();
+        socketService.closeProducer(activeProducers.audio.id);
+        setActiveProducers(p => ({ ...p, audio: null }));
+      } catch (err) {
+        console.error("[AUDIO] Error muting:", err);
+      }
     } else {
+      // UNMUTE
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
           audio: { 
@@ -291,63 +385,96 @@ export default function RoomPage() {
         const producer = await mediasoupService.produce(track);
         setActiveProducers(p => ({ ...p, audio: producer }));
       } catch (err) {
-        console.error("Mic Error", err);
+        console.error("[AUDIO] Mic Error:", err);
       }
     }
   };
 
   // ---------------------------------------------------------------------------
-  // 5. METRONOME SCHEDULER (WebAudio)
+  // 5. METRONOME SCHEDULER (WebAudio) - ✅ CORRECTED
   // ---------------------------------------------------------------------------
   const startScheduler = (tempo) => {
-    if (audioCtx.current.state === 'suspended') audioCtx.current.resume();
-    nextNoteTime.current = audioCtx.current.currentTime + 0.1;
+    if (audioCtx.current.state === 'suspended') {
+      audioCtx.current.resume();
+    }
+    
+    // ✅ Calculate aligned start time based on server metronome
+    const { startTime } = metronomeState;
+    const now = Date.now();
+    const serverNow = now + serverTimeOffset; // Adjust for clock skew
+    
+    // How many seconds until the metronome started (negative if already started)
+    const timeUntilStart = (startTime - serverNow) / 1000;
+    
+    // Calculate the first beat time in WebAudio context time
+    const audioCtxNow = audioCtx.current.currentTime;
+    const syncOffsetSeconds = mySyncOffset / 1000;
+    const firstBeatTime = audioCtxNow + timeUntilStart + syncOffsetSeconds;
+    
+    nextNoteTime.current = firstBeatTime;
+    beatCount.current = 0;
+    
+    console.log('[METRONOME] Starting scheduler:', {
+      tempo,
+      startTime,
+      serverNow,
+      timeUntilStart,
+      syncOffsetSeconds,
+      firstBeatTime
+    });
+    
     scheduler();
   };
 
   const stopScheduler = () => {
-    if (schedulerRef.current) clearTimeout(schedulerRef.current);
+    if (schedulerRef.current) {
+      clearTimeout(schedulerRef.current);
+      schedulerRef.current = null;
+    }
+    beatCount.current = 0;
   };
 
   const scheduler = () => {
     const tempo = metronomeState.tempo || 120;
     const secondsPerBeat = 60.0 / tempo;
-    const scheduleAheadTime = 0.1; 
+    const scheduleAheadTime = 0.1;
 
     while (nextNoteTime.current < audioCtx.current.currentTime + scheduleAheadTime) {
       scheduleNote(nextNoteTime.current);
       nextNoteTime.current += secondsPerBeat;
     }
+    
     schedulerRef.current = setTimeout(scheduler, 25);
   };
 
   const scheduleNote = (time) => {
     if (!clickBuffer.current) return;
     
-    // -- COMPENSATION LOGIC --
-    // If we are a follower, we might delay this click by `mySyncOffset` 
-    // to align with what the server expects.
-    // NOTE: This is a simplified implementation. True cascading sync 
-    // requires delaying the *input* stream, not just the click. 
-    // But hearing the click at the "right" time is step 1.
-    const playTime = time; // + (mySyncOffset / 1000); 
-
+    // ✅ Sync offset already applied in startScheduler
+    // Just play the click at the scheduled time
     const osc = audioCtx.current.createBufferSource();
     osc.buffer = clickBuffer.current;
     osc.connect(audioCtx.current.destination);
-    osc.start(playTime);
-
-    // If Leader, announce beat
-    if (participants.find(p => p.socketId === socketService.socket.id)?.isLeader) {
-       // Ideally send this via DataChannel for low latency
-       // socketService.announceBeat(...) // Using socket for now as per backend
+    osc.start(time);
+    
+    beatCount.current++;
+    
+    // If Leader, announce beat to room
+    const myParticipant = participants.find(p => p.socketId === socketService.socket?.id);
+    if (myParticipant?.isLeader) {
+      const serverAlignedTime = Date.now() + serverTimeOffset;
+      socketService.announceBeat(beatCount.current, serverAlignedTime);
     }
   };
 
   const toggleMetronome = () => {
     const newState = !metronomeState.isPlaying;
     socketService.updateMetronome({ isPlaying: newState }, (res) => {
-      if (!res.error) setMetronomeState(res.state);
+      if (res.error) {
+        console.error('[METRONOME] Update failed:', res.error);
+      } else {
+        setMetronomeState(res.state);
+      }
     });
   };
 
@@ -400,23 +527,27 @@ export default function RoomPage() {
   // ---------------------------------------------------------------------------
   // RENDER: ROOM
   // ---------------------------------------------------------------------------
-  const amILeader = participants.find(p => p.socketId === socketService.socket.id)?.isLeader;
+  const myParticipant = participants.find(p => p.socketId === socketService.socket?.id);
+  const amILeader = myParticipant?.isLeader;
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-200 p-4 font-sans">
       <header className="flex justify-between items-center max-w-6xl mx-auto mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <span className="text-indigo-500">⚡</span> Live Jam
+            <span className="text-indigo-500">🎹</span> Live Jam
           </h1>
           <div className="flex items-center gap-4 text-xs font-mono text-neutral-500 mt-1">
-            <span>Sync Offset: {mySyncOffset}ms</span>
+            <span>Sync Offset: <span className="text-indigo-400">{mySyncOffset}ms</span></span>
             <span>Clock Skew: {Math.round(serverTimeOffset)}ms</span>
+            {myServerLatency && (
+              <span>Server RTT: <span className={myServerLatency.rtt > 100 ? 'text-red-400' : 'text-green-400'}>{myServerLatency.rtt}ms</span></span>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
            <Button onClick={toggleAudio} variant={activeProducers.audio ? "danger" : "primary"}>
-             {activeProducers.audio ? "Mute Mic" : "Unmute Mic"}
+             {activeProducers.audio ? "🔇 Mute Mic" : "🎤 Unmute Mic"}
            </Button>
         </div>
       </header>
@@ -447,7 +578,7 @@ export default function RoomPage() {
                    className="w-full accent-indigo-500 bg-neutral-800 h-2 rounded-lg appearance-none"
                  />
                  <Button onClick={toggleMetronome} className="w-full" variant={metronomeState.isPlaying ? 'secondary' : 'success'}>
-                   {metronomeState.isPlaying ? 'Stop' : 'Start'}
+                   {metronomeState.isPlaying ? '⏸ Stop' : '▶ Start'}
                  </Button>
               </div>
             ) : (
@@ -462,22 +593,12 @@ export default function RoomPage() {
         <div className="lg:col-span-2 space-y-4">
           <h2 className="text-xs font-bold text-neutral-500 uppercase">Musicians ({participants.length})</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Me */}
-            <UserCard 
-              participant={{ 
-                displayName, 
-                role: selectedRole, 
-                isLeader: amILeader,
-                socketId: socketService.socket?.id 
-              }} 
-              isMe={true} 
-            />
-            {/* Others */}
-            {participants.filter(p => p.socketId !== socketService.socket.id).map(p => (
+            {participants.map(p => (
               <UserCard 
                 key={p.socketId} 
                 participant={p} 
-                latencyStats={latencyMatrix[socketService.socket.id]?.[p.socketId]} 
+                isMe={p.socketId === socketService.socket?.id}
+                serverLatency={p.socketId === socketService.socket?.id ? myServerLatency : null}
               />
             ))}
           </div>
@@ -486,7 +607,15 @@ export default function RoomPage() {
       
       {/* Hidden Audio Elements for remote streams */}
       {Array.from(remoteConsumers.values()).map(c => (
-        <audio key={c.id} ref={el => { if(el && c.track) el.srcObject = new MediaStream([c.track]); }} autoPlay />
+        <audio 
+          key={c.id} 
+          ref={el => { 
+            if(el && c.track) {
+              el.srcObject = new MediaStream([c.track]); 
+            }
+          }} 
+          autoPlay 
+        />
       ))}
     </div>
   );

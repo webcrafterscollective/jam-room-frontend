@@ -54,19 +54,16 @@ class SocketService {
     if (this.socket) this.socket.off(event, cb);
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // RPC Wrappers
-  // ───────────────────────────────────────────────────────────────────────────
-
   emit(event, data, callback) {
     if (!this.socket) return;
-    // console.log(`[RPC] ${event}`, data); 
     this.socket.emit(event, data, (response) => {
       if (callback) callback(response);
     });
   }
 
+  // ───────────────────────────────────────────────────────────────────────────
   // Room & Roles
+  // ───────────────────────────────────────────────────────────────────────────
   joinRoom({ roomId, role, displayName }, callback) {
     this.emit('joinRoom', { roomId, role, displayName }, callback);
   }
@@ -79,11 +76,9 @@ class SocketService {
     this.emit('requestLeadership', {}, callback);
   }
 
+  // ───────────────────────────────────────────────────────────────────────────
   // Mediasoup
-  getRouterRtpCapabilities(callback) {
-    this.emit('getRouterRtpCapabilities', {}, callback);
-  }
-
+  // ───────────────────────────────────────────────────────────────────────────
   createTransport(direction, callback) {
     this.emit('createTransport', { direction }, callback);
   }
@@ -100,6 +95,10 @@ class SocketService {
     this.emit('produceData', { transportId, ...params }, callback);
   }
 
+  closeProducer(producerId) {
+    this.socket?.emit('closeProducer', { producerId });
+  }
+
   consume(transportId, producerId, rtpCapabilities, callback) {
     this.emit('consume', { transportId, producerId, rtpCapabilities }, callback);
   }
@@ -113,32 +112,40 @@ class SocketService {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Time & Latency Sync (The "Production Grade" Logic)
+  // ✅ CORRECTED: Server-Mediated Latency Measurement
   // ───────────────────────────────────────────────────────────────────────────
+  
+  /**
+   * Measure RTT to server (not peer-to-peer)
+   */
+  pingServer(pingId, t0, callback) {
+    this.emit('pingServer', { pingId, t0 }, callback);
+  }
 
-  // 1. Sync Time: Client -> Server -> Client (Calculates Offset)
+  /**
+   * Report measured server latency to backend
+   * This triggers cascade recalculation of sync offsets
+   */
+  recordServerLatency(rtt) {
+    this.socket?.emit('recordServerLatency', { rtt });
+  }
+
+  /**
+   * Sync local clock with server
+   */
   syncTime(payload, callback) {
     this.emit('syncTime', payload, callback);
   }
 
-  // 2. Ping Peer: Client A -> Server -> Client B
-  pingPeer(targetSocketId, pingId, t0, callback) {
-    this.emit('pingPeer', { targetSocketId, pingId, t0 }, callback);
-  }
-
-  // 3. Pong Peer: Client B -> Server -> Client A
-  pongPeer(targetSocketId, pingId, t0) {
-    this.socket?.emit('pongPeer', { targetSocketId, pingId, t0 });
-  }
-
-  // 4. Record Latency: Client A reports RTT to Server
-  recordLatency(targetSocketId, rtt) {
-    this.socket?.emit('recordLatency', { targetSocketId, rtt });
-  }
-
-  // 5. Metronome Control
+  // ───────────────────────────────────────────────────────────────────────────
+  // Metronome Control
+  // ───────────────────────────────────────────────────────────────────────────
   updateMetronome({ isPlaying, tempo, beatsPerMeasure }, callback) {
     this.emit('updateMetronome', { isPlaying, tempo, beatsPerMeasure }, callback);
+  }
+
+  announceBeat(beatNumber, timestamp) {
+    this.socket?.emit('announceBeat', { beatNumber, timestamp });
   }
 }
 

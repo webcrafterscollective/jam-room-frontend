@@ -374,9 +374,9 @@ export default function RoomPage() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
           audio: { 
-            echoCancellation: false, 
-            noiseSuppression: false, 
-            autoGainControl: false,
+            echoCancellation: true, 
+            noiseSuppression: true, 
+            autoGainControl: true,
             latency: 0
           } 
         });

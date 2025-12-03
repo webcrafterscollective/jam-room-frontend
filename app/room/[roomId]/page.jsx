@@ -27,54 +27,46 @@ const RemoteAudio = ({ track, volume, ownerId, mySyncOffset, streamArrivals, aud
   const gainRef = useRef(null);
   const delayRef = useRef(null);
   const sourceRef = useRef(null);
+  const silentAudioRef = useRef(null); // Keep stream active
 
   // Calculate the specific delay needed for this stream
-  // Logic: "How long should I wait so I play exactly at the Metronome click?"
   const requiredDelay = useMemo(() => {
-    // If we don't have arrival data yet, play instantly (safe fallback)
     if (!streamArrivals || !streamArrivals[ownerId]) return 0; 
-    
-    // Server says: "This audio arrived at T=Arrival"
     const estimatedArrival = streamArrivals[ownerId];
-    
-    // Server says: "You should play at T=SyncOffset"
-    // Delay Needed = SyncOffset - Arrival
     const delayMs = mySyncOffset - estimatedArrival;
-    
-    // Clamp values: 
-    // - Min 0 (cannot predict future)
-    // - Max 2000ms (sanity check to prevent memory issues)
     const finalDelay = Math.max(0, Math.min(delayMs, 2000)) / 1000;
-    
-    // console.log(`[AUDIO] Aligning ${ownerId}: Added ${Math.round(finalDelay*1000)}ms delay`);
     return finalDelay;
   }, [mySyncOffset, streamArrivals, ownerId]);
 
+  // 1. Web Audio Graph (The Audible, Delayed Sound)
   useEffect(() => {
     if (!track || !audioCtx) return;
 
-    // 1. Create Audio Stream Source
+    // Create Audio Stream Source
     const stream = new MediaStream([track]);
     const source = audioCtx.createMediaStreamSource(stream);
     sourceRef.current = source;
 
-    // 2. Create Delay Node (The Buffer)
-    // Max delay capacity = 5.0 seconds
+    // Create Delay Node (Buffer)
     const delayNode = audioCtx.createDelay(5.0); 
     delayNode.delayTime.value = requiredDelay;
     delayRef.current = delayNode;
 
-    // 3. Create Gain Node (Volume)
+    // Create Gain Node (Volume)
     const gainNode = audioCtx.createGain();
     gainNode.gain.value = volume / 100;
     gainRef.current = gainNode;
 
-    // 4. Connect Graph: Source -> Delay -> Gain -> Destination (Speakers)
+    // Connect: Source -> Delay -> Gain -> Destination
     source.connect(delayNode);
     delayNode.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 
-    // Cleanup when participant leaves or track changes
+    // Ensure AudioContext is running (Double check)
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(e => console.error("Audio resume failed", e));
+    }
+
     return () => {
       source.disconnect();
       delayNode.disconnect();
@@ -82,22 +74,31 @@ const RemoteAudio = ({ track, volume, ownerId, mySyncOffset, streamArrivals, aud
     };
   }, [track, audioCtx]); 
 
-  // Dynamically update delay if sync/network conditions change
+  // 2. Hidden HTML Audio (The "Keep-Alive" Mechanism)
+  // We must play the track in an element (muted) so Chrome doesn't garbage collect the decoding stream.
+  useEffect(() => {
+    if (silentAudioRef.current && track) {
+      const stream = new MediaStream([track]);
+      silentAudioRef.current.srcObject = stream;
+    }
+  }, [track]);
+
+  // Dynamic Delay Update
   useEffect(() => {
     if (delayRef.current && audioCtx) {
-      // Smoothly transition to new delay over 0.1s to avoid pitch glitches/clicks
       delayRef.current.delayTime.setTargetAtTime(requiredDelay, audioCtx.currentTime, 0.1);
     }
   }, [requiredDelay, audioCtx]);
 
-  // Dynamically update volume
+  // Dynamic Volume Update
   useEffect(() => {
     if (gainRef.current && audioCtx) {
       gainRef.current.gain.setTargetAtTime(volume / 100, audioCtx.currentTime, 0.05);
     }
   }, [volume, audioCtx]);
 
-  return null; // Logic only, no UI
+  // Render hidden muted audio to ensure browser processes the stream
+  return <audio ref={silentAudioRef} autoPlay muted playsInline hidden />;
 };
 
 const Button = ({ children, onClick, disabled, className = '', variant = 'primary' }) => {
@@ -425,6 +426,14 @@ export default function RoomPage() {
   // ---------------------------------------------------------------------------
   const handleJoin = () => {
     if (!displayName) return alert("Please enter a name");
+
+    // ✅ FIXED: Resume AudioContext on User Gesture
+    if (audioCtx.current && audioCtx.current.state === 'suspended') {
+      audioCtx.current.resume().then(() => {
+        console.log("Audio Context Resumed");
+      });
+    }
+
     socketService.connect(process.env.NEXT_PUBLIC_SIGNAL_URL || 'http://localhost:4000', () => {
       socketService.joinRoom({ roomId, role: selectedRole, displayName }, async (res) => {
         if (res.error) return alert(res.error);

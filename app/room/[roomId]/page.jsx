@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { socketService } from '../../services/SocketService';
 import { mediasoupService } from '../../services/MediasoupService';
@@ -22,24 +22,82 @@ const ROLE_DEFINITIONS = {
 // COMPONENTS
 // -----------------------------------------------------------------------------
 
-// 🔊 NEW: Component to handle audio stream and volume updates reactively
-const RemoteAudio = ({ track, volume }) => {
-  const audioRef = useRef(null);
+// 🔊 UPDATED: Smart Audio Component with Stream Alignment (Web Audio API)
+const RemoteAudio = ({ track, volume, ownerId, mySyncOffset, streamArrivals, audioCtx }) => {
+  const gainRef = useRef(null);
+  const delayRef = useRef(null);
+  const sourceRef = useRef(null);
+
+  // Calculate the specific delay needed for this stream
+  // Logic: "How long should I wait so I play exactly at the Metronome click?"
+  const requiredDelay = useMemo(() => {
+    // If we don't have arrival data yet, play instantly (safe fallback)
+    if (!streamArrivals || !streamArrivals[ownerId]) return 0; 
+    
+    // Server says: "This audio arrived at T=Arrival"
+    const estimatedArrival = streamArrivals[ownerId];
+    
+    // Server says: "You should play at T=SyncOffset"
+    // Delay Needed = SyncOffset - Arrival
+    const delayMs = mySyncOffset - estimatedArrival;
+    
+    // Clamp values: 
+    // - Min 0 (cannot predict future)
+    // - Max 2000ms (sanity check to prevent memory issues)
+    const finalDelay = Math.max(0, Math.min(delayMs, 2000)) / 1000;
+    
+    // console.log(`[AUDIO] Aligning ${ownerId}: Added ${Math.round(finalDelay*1000)}ms delay`);
+    return finalDelay;
+  }, [mySyncOffset, streamArrivals, ownerId]);
 
   useEffect(() => {
-    if (audioRef.current && track) {
-      audioRef.current.srcObject = new MediaStream([track]);
-    }
-  }, [track]);
+    if (!track || !audioCtx) return;
 
+    // 1. Create Audio Stream Source
+    const stream = new MediaStream([track]);
+    const source = audioCtx.createMediaStreamSource(stream);
+    sourceRef.current = source;
+
+    // 2. Create Delay Node (The Buffer)
+    // Max delay capacity = 5.0 seconds
+    const delayNode = audioCtx.createDelay(5.0); 
+    delayNode.delayTime.value = requiredDelay;
+    delayRef.current = delayNode;
+
+    // 3. Create Gain Node (Volume)
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = volume / 100;
+    gainRef.current = gainNode;
+
+    // 4. Connect Graph: Source -> Delay -> Gain -> Destination (Speakers)
+    source.connect(delayNode);
+    delayNode.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    // Cleanup when participant leaves or track changes
+    return () => {
+      source.disconnect();
+      delayNode.disconnect();
+      gainNode.disconnect();
+    };
+  }, [track, audioCtx]); 
+
+  // Dynamically update delay if sync/network conditions change
   useEffect(() => {
-    if (audioRef.current) {
-      // Convert 0-100 integer to 0.0-1.0 float
-      audioRef.current.volume = volume / 100;
+    if (delayRef.current && audioCtx) {
+      // Smoothly transition to new delay over 0.1s to avoid pitch glitches/clicks
+      delayRef.current.delayTime.setTargetAtTime(requiredDelay, audioCtx.currentTime, 0.1);
     }
-  }, [volume]);
+  }, [requiredDelay, audioCtx]);
 
-  return <audio ref={audioRef} autoPlay />;
+  // Dynamically update volume
+  useEffect(() => {
+    if (gainRef.current && audioCtx) {
+      gainRef.current.gain.setTargetAtTime(volume / 100, audioCtx.currentTime, 0.05);
+    }
+  }, [volume, audioCtx]);
+
+  return null; // Logic only, no UI
 };
 
 const Button = ({ children, onClick, disabled, className = '', variant = 'primary' }) => {
@@ -53,7 +111,7 @@ const Button = ({ children, onClick, disabled, className = '', variant = 'primar
   return <button onClick={onClick} disabled={disabled} className={`${base} ${variants[variant]} ${className}`}>{children}</button>;
 };
 
-// 🔊 UPDATED: Now accepts volume and onVolumeChange
+// User Card Component
 const UserCard = ({ participant, isMe, serverLatency, volume = 100, onVolumeChange }) => {
   const roleDef = ROLE_DEFINITIONS[participant.role] || ROLE_DEFINITIONS.SPECTATOR;
   
@@ -85,7 +143,7 @@ const UserCard = ({ participant, isMe, serverLatency, volume = 100, onVolumeChan
         </div>
       )}
 
-      {/* 🔊 NEW: Volume Slider for Remote Participants */}
+      {/* Volume Slider for Remote Participants */}
       {!isMe && (
         <div className="mt-3 bg-black/40 p-2 rounded flex items-center gap-2">
           <span className="text-xs text-neutral-400">🔈</span>
@@ -118,8 +176,6 @@ export default function RoomPage() {
   // -- ROOM STATE --
   const [participants, setParticipants] = useState([]);
   const [myServerLatency, setMyServerLatency] = useState(null);
-  
-  // 🔊 NEW: State for per-user volume control
   const [userVolumes, setUserVolumes] = useState({});
 
   const [metronomeState, setMetronomeState] = useState({ 
@@ -132,7 +188,10 @@ export default function RoomPage() {
   const metronomeStateRef = useRef(metronomeState);
 
   const [mySyncOffset, setMySyncOffset] = useState(0);
-  const mySyncOffsetRef = useRef(0); // Ref to access sync offset in event handlers
+  const mySyncOffsetRef = useRef(0); 
+
+  // NEW: Store expected arrival times for all streams for alignment
+  const [streamArrivals, setStreamArrivals] = useState({}); 
 
   const [serverTimeOffset, setServerTimeOffset] = useState(0);
   
@@ -168,6 +227,7 @@ export default function RoomPage() {
   // 1. INITIALIZATION
   // ---------------------------------------------------------------------------
   useEffect(() => {
+    // Initialize Web Audio Context
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     audioCtx.current = ctx;
     
@@ -254,12 +314,17 @@ export default function RoomPage() {
       });
     };
 
-    // ✅ FIXED: Smooth Sync Update (No Restart)
-    const onSyncOffsetUpdate = ({ syncOffset, metronome }) => {
-      console.log('[SYNC] Offset updated:', syncOffset, 'ms');
+    // ✅ FIXED: Smooth Sync Update with Stream Alignment Data
+    const onSyncOffsetUpdate = ({ syncOffset, metronome, streamArrivals }) => {
+      console.log('[SYNC] Offset:', syncOffset, 'ms | Arrivals:', streamArrivals);
       
       const oldOffset = mySyncOffsetRef.current;
       updateSyncOffset(syncOffset);
+      
+      // Store arrival times for stream alignment
+      if (streamArrivals) {
+        setStreamArrivals(streamArrivals);
+      }
       
       if (metronome) {
         setMetronomeState(prev => ({ ...prev, ...metronome }));
@@ -338,7 +403,7 @@ export default function RoomPage() {
       latencyInterval = setInterval(measureLatency, 2000);
     }
 
-    // ✅ FIXED: Cleanup Function (Removes listeners to prevent duplicates)
+    // Cleanup Function
     return () => {
       socketService.off('participantJoined', onParticipantJoined);
       socketService.off('participantLeft', onParticipantLeft);
@@ -353,7 +418,7 @@ export default function RoomPage() {
       clearInterval(syncInterval);
       clearInterval(latencyInterval);
     };
-  }, [step]); // Only re-run if 'step' changes (Refs handle other state updates)
+  }, [step]); 
 
   // ---------------------------------------------------------------------------
   // 3. JOIN LOGIC
@@ -455,6 +520,7 @@ export default function RoomPage() {
     const tempo = metronomeStateRef.current.tempo; 
     const beatDuration = 60 / tempo;
     
+    // START TIME = Current Time + Wait for Start + SYNC OFFSET
     let firstBeatTime = audioCtxNow + timeUntilStart + syncOffsetSeconds;
     
     // If we joined late, calculate next beat in the future
@@ -466,7 +532,7 @@ export default function RoomPage() {
     }
     
     nextNoteTime.current = firstBeatTime;
-    beatCount.current = 0; // Or keep incrementing if we tracked measures
+    beatCount.current = 0;
     
     console.log('[METRONOME] Starting:', { tempo, firstBeatTime });
     scheduler();
@@ -480,7 +546,6 @@ export default function RoomPage() {
   };
 
   const scheduler = () => {
-    // ✅ FIXED: Read tempo from Ref to handle updates while playing
     const tempo = metronomeStateRef.current.tempo || 120;
     const secondsPerBeat = 60.0 / tempo;
     const scheduleAheadTime = 0.1;
@@ -641,12 +706,18 @@ export default function RoomPage() {
         </div>
       </div>
       
-      {/* 🔊 UPDATED: Render Audio with Volume Control */}
+      {/* 🔊 UPDATED: Remote Audio Renderer using Stream Alignment Logic */}
       {Array.from(remoteConsumers.entries()).map(([ownerId, consumer]) => (
         <RemoteAudio 
           key={ownerId} 
           track={consumer.track} 
           volume={userVolumes[ownerId] ?? 100} 
+          
+          // Pass Stream Alignment Data
+          ownerId={ownerId}
+          mySyncOffset={mySyncOffset}
+          streamArrivals={streamArrivals}
+          audioCtx={audioCtx.current}
         />
       ))}
     </div>
